@@ -1,0 +1,35 @@
+{
+ "_about": "Main settings for Goalscraper (data from OpenFootAPI's free plan).",
+ "timezone": "Europe/Dublin",
+ "run_time_local": "06:15",
+ "window_hours": 24,
+ "min_odds": 1.03,
+ "top_n": 10,
+ "weights": {
+  "_about": "form = how much recent games tweak long-term strength (0 to 1).",
+  "form": 0.15
+ },
+ "model": {
+  "strength_half_life_days": 240,
+  "form_half_life_days": 24,
+  "prior_spread": 0.35,
+  "form_spread": 0.15,
+  "league_strength_scale": 0.55,
+  "previous_season_if_games_below": 8,
+  "previous_season_weight": 0.5,
+  "limited_data_games": 6,
+  "limited_data_score_factor": 0.92
+ },
+ "score_scale": {
+  "_about": "Score 100 when P(0-0) is at or below 'p00_at_100', score 1 at or above 'p00_at_1' (log scale in between).",
+  "p00_at_100": 0.01,
+  "p00_at_1": 0.3
+ },
+ "history_days": 400,
+ "requests": {
+  "_about": "OpenFootAPI free plan: 5,000 requests a month. A normal day uses about 10-20; the first run uses more to collect the season so far.",
+  "max_per_run": 600,
+  "keep_in_reserve": 100,
+  "sweep_days_back": 2
+ }
+}
