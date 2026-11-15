@@ -18,7 +18,8 @@
   "previous_season_if_games_below": 8,
   "previous_season_weight": 0.5,
   "limited_data_games": 6,
-  "limited_data_score_factor": 0.92
+  "limited_data_score_factor": 0.92,
+  "national_strength_scale": 0.7
  },
  "score_scale": {
   "_about": "Score 100 when P(0-0) is at or below 'p00_at_100', score 1 at or above 'p00_at_1' (log scale in between).",

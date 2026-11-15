@@ -334,6 +334,7 @@ class Build:
         self.discovered = {}        # no -> [ids] found later in OpenFootAPI's catalogue
         self.other = comp_doc["other_league_strength"]
         self.confed = comp_doc["confederation_strength"]
+        self.nat_table_src = comp_doc.get("national_team_strength")
         self.tz = ZoneInfo(settings["timezone"])
         self.ref = ref_utc
         self.ref_ts = int(ref_utc.timestamp())
@@ -559,10 +560,25 @@ class Build:
                 hl = self.home_league(t)
                 s = self.league_strength(hl) if hl else self.other["default"]
             else:
-                s = self.confed.get(self.nat_confed(t), self.confed["unknown"])
+                s = self.nation_strength(t)
+                if s is None:
+                    s = self.confed.get(self.nat_confed(t), self.confed["unknown"])
+                o = self.S["model"].get("national_strength_scale", scale) * (s - 50) / 50
+                pri[t] = (o, o)
+                continue
             o = scale * (s - 50) / 50
             pri[t] = (o, o)
         return pri
+
+    def nation_strength(self, t):
+        if not hasattr(self, "_nat_table"):
+            nt = self.nat_table_src or {}
+            self._nat_table = {norm(k): v for k, v in (nt.get("teams") or {}).items()}
+            for alias, real in (nt.get("aliases") or {}).items():
+                if norm(real) in self._nat_table:
+                    self._nat_table[norm(alias)] = self._nat_table[norm(real)]
+        name = norm(re.sub(r"\b(women|w|u21|u23)\b", "", str((self.store.teams.get(t) or [t])[0])))
+        return self._nat_table.get(name)
 
     def nat_confed(self, t):
         names = " ".join(norm(self.store.comp_name(v[0])) for v in self.store.matches.values() if t in (v[3], v[4]))
