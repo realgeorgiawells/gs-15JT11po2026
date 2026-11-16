@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 """
-Goalscraper: each morning, score every game in the next 24 hours on how unlikely it is to end 0-0.
+Goalscraper: each morning, rate every game in the next 24 hours for four sections:
+  Easy Goals (at least one goal), Misses (a team not to win), Ballon d'Or (a team to win),
+  Raining Goals (both teams to score). Every prediction is stored, settled and used to self-adjust the model.
 Data: OpenFootAPI (free Starter plan, 5,000 requests a month).
 
   python goalscraper.py                    # normal daily run (needs OPENFOOT_API_KEY)
@@ -201,12 +203,6 @@ def rating(x, spread):
     return round(50 + 50 * math.tanh(x / spread), 1)
 
 
-def score_from_p00(p00, scale):
-    hi, lo = scale["p00_at_100"], scale["p00_at_1"]
-    p = min(max(p00, hi), lo)
-    return 1 + 99 * (math.log(lo) - math.log(p)) / (math.log(lo) - math.log(hi))
-
-
 # ----------------------------------------------------------------------------------------------
 # Results store (kept between runs)
 #   matches: id -> [comp, season, ts, home, away, home_goals, away_goals, status, round]
@@ -223,8 +219,10 @@ class Store:
         self.last_sweep = d.get("last_sweep")
         self.seasons = d.get("seasons", {})      # comp -> latest season label seen
 
-    def save(self, keep_after_ts):
-        self.matches = {k: v for k, v in self.matches.items() if v[2] >= keep_after_ts}
+    def save(self, keep_after_ts, keep_longer=(), longer_after_ts=None):
+        """Drop old results; international competitions are kept longer (national teams play rarely)."""
+        self.matches = {k: v for k, v in self.matches.items()
+                        if v[2] >= keep_after_ts or (v[0] in keep_longer and v[2] >= (longer_after_ts or keep_after_ts))}
         save_json(self.path, {"matches": self.matches, "teams": self.teams, "comps": self.comps,
                               "backfilled": self.backfilled, "last_sweep": self.last_sweep, "seasons": self.seasons})
 
@@ -322,11 +320,263 @@ def fit_pool(matches, priors, spread, half_life_days, ref_ts, iters=40):
 
 
 # ----------------------------------------------------------------------------------------------
+# Probabilities for a game: win/draw/loss (with draw correction), 0-0, each side scoring, both scoring
+# ----------------------------------------------------------------------------------------------
+SECTIONS = ("goals", "misses", "ballon", "btts")
+NEUTRAL_COMPS = (41, 43, 46, 47, 49, 52)
+
+
+def logit(p):
+    p = min(max(p, 1e-6), 1 - 1e-6)
+    return math.log(p / (1 - p))
+
+
+def sigmoid(x):
+    return 1 / (1 + math.exp(-x))
+
+
+def match_probs(lh, la, rho, maxg=10):
+    """Dixon-Coles style matrix: rho < 0 adds a little weight to 0-0 and 1-1 (draws), which plain Poisson undercounts."""
+    ph = [poisson_pmf(i, lh) for i in range(maxg)]
+    pa = [poisson_pmf(j, la) for j in range(maxg)]
+    H = D = A = tot = p00 = h0 = a0 = 0.0
+    for i in range(maxg):
+        for j in range(maxg):
+            p = ph[i] * pa[j]
+            if i == 0 and j == 0:
+                p *= max(0.0, 1 - lh * la * rho)
+            elif i == 0 and j == 1:
+                p *= max(0.0, 1 + lh * rho)
+            elif i == 1 and j == 0:
+                p *= max(0.0, 1 + la * rho)
+            elif i == 1 and j == 1:
+                p *= max(0.0, 1 - rho)
+            tot += p
+            if i > j:
+                H += p
+            elif i == j:
+                D += p
+            else:
+                A += p
+            if i == 0:
+                h0 += p
+            if j == 0:
+                a0 += p
+            if i == 0 and j == 0:
+                p00 = p
+    return {"w": H / tot, "d": D / tot, "l": A / tot, "p00": p00 / tot,
+            "hs": 1 - h0 / tot, "as": 1 - a0 / tot, "btts": (1 - h0 / tot - a0 / tot + p00 / tot)}
+
+
+def calibrated(lh, la, group, ms):
+    """Apply the self-adjusted factors for this group ('club' or 'intl')."""
+    f = ms["fav"][group]
+    if lh >= la:
+        lh2, la2 = lh * math.exp(f), la * math.exp(-f)
+    else:
+        lh2, la2 = lh * math.exp(-f), la * math.exp(f)
+    p = match_probs(lh2, la2, ms["rho"][group])
+    p["p00"] = sigmoid(logit(p["p00"]) + ms["z00"][group])
+    p["btts"] = sigmoid(logit(p["btts"]) + ms["btts"][group])
+    return p
+
+
+def scale_score(fail, at100, at50):
+    """1-100 on a log scale of the chance of the pick going wrong: at100 -> 100, at50 -> 50."""
+    k = 49 / 99
+    lw = (math.log(at50) - k * math.log(at100)) / (1 - k)
+    lb = math.log(at100)
+    f = min(max(fail, at100), math.exp(lw))
+    return 1 + 99 * (lw - math.log(f)) / (lw - lb)
+
+
+def section_scores(p, S):
+    """Returns {section: {...}} with listed / score / team / p for one game's probabilities."""
+    sec = S["sections"]
+    out = {}
+    g = sec["goals"]
+    out["goals"] = {"listed": (1 - p["p00"]) <= g["max_chance_of_goal"] + 1e-9,
+                    "score": scale_score(p["p00"], g["fail_at_100"], g["fail_at_50"]), "p": 1 - p["p00"]}
+    fav = "home" if p["w"] >= p["l"] else "away"
+    dog = "away" if fav == "home" else "home"
+    pf, pd = (p["w"], p["l"]) if fav == "home" else (p["l"], p["w"])
+    b, m = sec["ballon"], sec["misses"]
+    out["ballon"] = {"listed": pf >= b["min_favourite"], "team": fav, "p": pf,
+                     "score": scale_score(1 - pf, b["fail_at_100"], b["fail_at_50"])}
+    out["misses"] = {"listed": pf < b["min_favourite"] and pd >= 1 / (m["longest_price"] + 1), "team": dog, "p": 1 - pd,
+                     "score": scale_score(pd, m["fail_at_100"], m["fail_at_50"])}
+    t = sec["btts"]
+    out["btts"] = {"listed": True, "score": scale_score(1 - p["btts"], t["fail_at_100"], t["fail_at_50"]), "p": p["btts"]}
+    return out
+
+
+def pick_won(section, team, gh, ga):
+    if section == "goals":
+        return gh + ga >= 1
+    if section == "btts":
+        return gh > 0 and ga > 0
+    won = gh > ga if team == "home" else ga > gh
+    return won if section == "ballon" else not won
+
+
+# ----------------------------------------------------------------------------------------------
+# Prediction log: every game scored (and replayed), one file per month, results filled in later
+# ----------------------------------------------------------------------------------------------
+class PredLog:
+    def __init__(self, folder):
+        self.folder = Path(folder)
+        self.months, self.dirty = {}, set()
+
+    def month_of(self, ts):
+        return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m")
+
+    def load(self, month):
+        if month not in self.months:
+            self.months[month] = load_json(self.folder / f"{month}.json", {})
+        return self.months[month]
+
+    def load_range(self, from_ts, to_ts):
+        d = datetime.fromtimestamp(from_ts, timezone.utc).replace(day=1)
+        end = datetime.fromtimestamp(to_ts, timezone.utc)
+        while d <= end:
+            self.load(d.strftime("%Y-%m"))
+            d = (d + timedelta(days=32)).replace(day=1)
+
+    def put(self, fid, entry, replay=False):
+        m = self.load(self.month_of(entry["ts"]))
+        old = m.get(fid)
+        if replay and old and not old.get("rp"):
+            return                       # never overwrite a real prediction with a replay
+        if old and old.get("r") is not None and entry.get("r") is None:
+            entry["r"] = old["r"]
+        m[fid] = entry
+        self.dirty.add(self.month_of(entry["ts"]))
+
+    def entries(self, from_ts=0, to_ts=10**12):
+        for m in self.months.values():
+            for fid, e in m.items():
+                if from_ts <= e["ts"] < to_ts:
+                    yield fid, e
+
+    def settle(self, store, ref_ts):
+        for month, m in self.months.items():
+            for fid, e in m.items():
+                if e.get("r") is not None or e["ts"] >= ref_ts:
+                    continue
+                v = store.matches.get(fid)
+                if v and v[7] == "finished" and v[5] is not None and v[6] is not None:
+                    e["r"] = [v[5], v[6]]
+                elif (v and v[7] in ("postponed", "cancelled")) or e["ts"] < ref_ts - 4 * 86400:
+                    e["r"] = "void"
+                else:
+                    continue
+                self.dirty.add(month)
+
+    def save(self):
+        for month in self.dirty:
+            save_json(self.folder / f"{month}.json", self.months[month])
+        self.dirty = set()
+
+
+# ----------------------------------------------------------------------------------------------
+# Model state: what the daily self-adjustment has learned (data/model_state.json)
+# ----------------------------------------------------------------------------------------------
+LIMITS = {"rho": (-0.20, 0.05, 0.01), "fav": (-0.15, 0.15, 0.01), "z00": (-0.60, 0.60, 0.04), "btts": (-0.50, 0.50, 0.04)}
+MIN_GAMES = {"club": 400, "intl": 150}
+NAMES = {"rho": "Draw correction", "fav": "Favourite strength", "z00": "0-0 allowance", "btts": "Both-score allowance"}
+
+
+def default_state(S):
+    sv = S["starting_values"]
+    return {"version": 1, "rho": {"club": sv["draw_correction"], "intl": sv["draw_correction"]},
+            "fav": {"club": 0.0, "intl": 0.0}, "z00": {"club": 0.0, "intl": 0.0}, "btts": {"club": 0.0, "intl": 0.0},
+            "form_weight": sv["form_weight"], "half_life": sv["strength_half_life_days"], "league_adj": {},
+            "tuning": {}, "changes": [], "check": [], "replay_back_to": None}
+
+
+class Calibrator:
+    """Daily: compares stored predictions with results and nudges the model where the evidence says it's off."""
+
+    def __init__(self, state, log, ref_ts, say):
+        self.ms, self.log, self.ref_ts, self.say = state, log, ref_ts, say
+        self.changes = []
+
+    def note(self, text):
+        self.changes.append(text)
+
+    def settled(self, group, days=365, limit=4000):
+        out = []
+        for fid, e in self.log.entries(self.ref_ts - days * 86400, self.ref_ts):
+            if isinstance(e.get("r"), list) and ("intl" if e.get("i") else "club") == group:
+                out.append(e)
+        out.sort(key=lambda e: -e["ts"])
+        return out[:limit]
+
+    def loss(self, rows, param, group, value):
+        ms = json.loads(json.dumps(self.ms))
+        ms[param][group] = value
+        tot = wsum = 0.0
+        for e in rows:
+            w = 0.5 ** (max(0, self.ref_ts - e["ts"]) / 86400 / 120)
+            p = calibrated(e["lh"], e["la"], group, ms)
+            gh, ga = e["r"]
+            if param in ("rho", "fav"):
+                q = p["w"] if gh > ga else p["d"] if gh == ga else p["l"]
+            elif param == "z00":
+                q = p["p00"] if gh + ga == 0 else 1 - p["p00"]
+            else:
+                q = p["btts"] if (gh > 0 and ga > 0) else 1 - p["btts"]
+            tot -= w * math.log(max(q, 1e-9))
+            wsum += w
+        return tot / max(wsum, 1e-9)
+
+    def step_probabilities(self):
+        for group in ("club", "intl"):
+            rows = self.settled(group)
+            if len(rows) < MIN_GAMES[group]:
+                continue
+            for param in ("rho", "fav", "z00", "btts"):
+                lo, hi, step = LIMITS[param]
+                cur = self.ms[param][group]
+                cands = {v: self.loss(rows, param, group, v) for v in (max(lo, cur - step), cur, min(hi, cur + step))}
+                best = min(cands, key=cands.get)
+                if best != cur and cands[cur] - cands[best] > 2e-5:
+                    self.ms[param][group] = round(best, 4)
+                    who = "Internationals" if group == "intl" else "Clubs"
+                    more = (best < cur) if param == "rho" else (best > cur)
+                    what = {"rho": ("draws forecast", "draws ran above forecast", "draws ran below forecast"),
+                            "fav": ("favourites' strength", "favourites did better than forecast", "favourites did worse than forecast"),
+                            "z00": ("0-0 allowance", "0-0s ran above forecast", "0-0s ran below forecast"),
+                            "btts": ("both-score allowance", "both teams scored more than forecast", "both teams scored less than forecast")}[param]
+                    self.note(f"{who}: {what[0]} {'raised' if more else 'lowered'} slightly "
+                              f"({what[1] if more else what[2]}, {len(rows)} games).")
+
+    def model_check(self):
+        lines = []
+        for group, label in (("club", "Clubs"), ("intl", "Internationals")):
+            rows = [e for e in self.settled(group, days=90, limit=10**6) if e.get("p")]
+            if len(rows) < 30:
+                continue
+            n = len(rows)
+            f00 = sum(e["p"]["p00"] for e in rows) / n * 100
+            a00 = sum(1 for e in rows if sum(e["r"]) == 0) / n * 100
+            fd = sum(e["p"]["d"] for e in rows) / n * 100
+            ad = sum(1 for e in rows if e["r"][0] == e["r"][1]) / n * 100
+            fb = sum(e["p"]["btts"] for e in rows) / n * 100
+            ab = sum(1 for e in rows if e["r"][0] > 0 and e["r"][1] > 0) / n * 100
+            lines.append({"label": f"{label}: 0-0s per 100 games", "forecast": round(f00, 1), "actual": round(a00, 1), "n": n})
+            lines.append({"label": f"{label}: draws per 100 games", "forecast": round(fd, 1), "actual": round(ad, 1), "n": n})
+            lines.append({"label": f"{label}: both teams scored, per 100", "forecast": round(fb, 1), "actual": round(ab, 1), "n": n})
+        self.ms["check"] = lines
+
+
+# ----------------------------------------------------------------------------------------------
 # The daily build
 # ----------------------------------------------------------------------------------------------
 class Build:
-    def __init__(self, api, settings, comp_doc, store, ref_utc, log=print):
+    def __init__(self, api, settings, comp_doc, store, ref_utc, model_state, log=print):
         self.api, self.S, self.store, self.log = api, settings, store, log
+        self.ms = model_state
         self.comps = comp_doc["competitions"]
         self.comp_by_no = {c["no"]: c for c in self.comps}
         self.comp_ids = {c["no"]: [c["openfoot_id"]] for c in self.comps if c.get("openfoot_id")}
@@ -342,7 +592,7 @@ class Build:
         self.cov = {}
         self.notes = []
 
-    # ---------------- competitions catalogue (refreshed weekly) ----------------
+    # ---------------- competitions catalogue (refreshed every 3 days) ----------------
     def load_catalogue(self):
         if self.store.comps and self.ref_ts - self.store.comps.get("_fetched", {}).get("at", 0) < 3 * 86400:
             self.discover()
@@ -404,8 +654,7 @@ class Build:
                     country = norm(t[2])
                     break
         y = self.ref.year
-        calendar = country in CALENDAR_COUNTRIES
-        if calendar:
+        if country in CALENDAR_COUNTRIES:
             return season_label(y, True)
         return season_label(y if self.ref.month >= 7 else y - 1, False)
 
@@ -432,8 +681,26 @@ class Build:
                       if tid in (v[3], v[4]) and not self.store.is_cup(v[0]))
         return cnt.most_common(1)[0][0] if cnt else None
 
+    def pool_of(self, cid):
+        no = self.of_to_no.get(cid)
+        return self.comp_by_no[no]["pool"] if no else "men_club"
+
+    def nat_history_comps(self):
+        """Extra international competitions to collect when national teams play: World Cup and earlier Nations Leagues."""
+        wanted = []
+        wc = (self.comp_ids.get(41) or [None])[0]
+        if wc:
+            wanted += [(wc, "2026"), (wc, "2022")]
+        nl = (self.comp_ids.get(45) or [None])[0]
+        if nl:
+            cur = self.store.seasons.get(nl) or season_label(self.ref.year if self.ref.month >= 7 else self.ref.year - 1, False)
+            p1 = season_prev(cur)
+            p2 = season_prev(p1) if p1 else None
+            wanted += [(nl, cur)] + [(nl, s) for s in (p1, p2) if s]
+        return wanted
+
     # ---------------- run ----------------
-    def run(self, history):
+    def run(self):
         S, M, R = self.S, self.S["model"], self.S["requests"]
         stats = {"dropped_postponed": 0, "dropped_started": 0, "other_competitions": 0}
 
@@ -447,8 +714,7 @@ class Build:
                 self.store.backfilled = {}          # too long a gap: rebuild seasons
             else:
                 first = min(first, last - timedelta(days=1))
-        dates = []
-        d = first
+        dates, d = [], first
         while d <= end_day:
             dates.append(d.isoformat())
             d += timedelta(days=1)
@@ -476,10 +742,7 @@ class Build:
             cands[no].append({"id": mid, "comp": comp, "season": season, "ts": ts, "home": h, "away": a,
                               "round": rnd, "time_known": known})
 
-        # 3) settle earlier predictions from stored results
-        self.settle(history)
-
-        # 4) make sure each competition's season (and each cup side's home league) is in the store
+        # 3) make sure each competition's season (and each cup side's home league) is in the store
         order = sorted(self.comps, key=lambda c: (-c["value"], c["prestige"], c["no"]))
         budget_out = False
         season_start = self.ref_ts - 330 * 86400
@@ -500,18 +763,22 @@ class Build:
                 for comp, season in sorted({(m["comp"], m["season"]) for m in cands[no]}):
                     self.backfill(comp, season or self.guess_season(comp))
                 teams = {t for m in cands[no] for t in (m["home"], m["away"])}
-                if c["kind"] != "league":
+                if c["pool"].endswith("nat"):
+                    for comp, season in self.nat_history_comps():
+                        self.backfill(comp, season)
+                elif c["kind"] != "league":
                     for t in sorted(teams):
                         hl = self.home_league(t)
                         if hl and hl not in self.comp_ids.get(no, []):
                             self.backfill(hl, self.guess_season(hl))
-                thin = [t for t in teams if self.team_games(t, season_start) < M["previous_season_if_games_below"]]
-                if thin:
-                    comps_needed = {self.home_league(t) or m["comp"] for m in cands[no] for t in (m["home"], m["away"]) if t in thin}
-                    for comp in sorted(x for x in comps_needed if x):
-                        prev = season_prev(self.guess_season(comp))
-                        if prev:
-                            self.backfill(comp, prev)
+                if not c["pool"].endswith("nat"):
+                    thin = [t for t in teams if self.team_games(t, season_start) < M["previous_season_if_games_below"]]
+                    if thin:
+                        needed = {self.home_league(t) or m["comp"] for m in cands[no] for t in (m["home"], m["away"]) if t in thin}
+                        for comp in sorted(x for x in needed if x):
+                            prev = season_prev(self.guess_season(comp))
+                            if prev:
+                                self.backfill(comp, prev)
                 cov["status"] = "covered"
             except BudgetExhausted:
                 budget_out = True
@@ -524,17 +791,29 @@ class Build:
                 cov["status"] = "error"
                 cov["note"] = str(e)[:200]
 
-        preds = self.predict(cands)
+        items = defaultdict(list)
+        for no, ms in cands.items():
+            if self.cov.get(no, {}).get("status") in ("omitted_budget", "blocked_plan", "error", "not_available"):
+                continue
+            for m in ms:
+                items[self.comp_by_no[no]["pool"]].append((no, m))
+        preds = []
+        for pool, its in items.items():
+            fit = self.fit_ratings(pool, self.ref_ts, {t for _, m in its for t in (m["home"], m["away"])})
+            self.log(f"  {pool}: {len(fit['matches'])} results, {len(fit['pri'])} teams")
+            preds += self.predict(its, fit)
+        rank_sections(preds, self.S)
         for no, cov in self.cov.items():
             if cov["status"] in ("covered", "partial"):
                 cov["games"] = sum(1 for p in preds if p["comp_no"] == no)
         return preds, stats
 
-    # ---------------- model ----------------
+    # ---------------- ratings ----------------
     def league_strength(self, cid):
         no = self.of_to_no.get(cid)
+        adj = self.ms.get("league_adj", {}).get(cid, 0.0)
         if no and "strength" in self.comp_by_no[no]:
-            return self.comp_by_no[no]["strength"]
+            return self.comp_by_no[no]["strength"] + adj
         meta = self.store.comps.get(cid) or {}
         country = meta.get("country") or ""
         if not country:
@@ -550,23 +829,21 @@ class Build:
             tier = 3
         elif re.search(r"\b(2|ii|b|second|segunda|eerste|ligue 2|serie b|liga 2|j2|primera nacional|usl|championship)\b", n):
             tier = 2
-        return max(10, base - self.other["lower_division_penalty"] * (tier - 1))
+        return max(10, base - self.other["lower_division_penalty"] * (tier - 1)) + adj
 
     def priors_for(self, pool, teams):
-        scale = self.S["model"]["league_strength_scale"]
+        M = self.S["model"]
         pri = {}
         for t in teams:
             if pool.endswith("club"):
                 hl = self.home_league(t)
                 s = self.league_strength(hl) if hl else self.other["default"]
+                o = M["league_strength_scale"] * (s - 50) / 50
             else:
                 s = self.nation_strength(t)
                 if s is None:
                     s = self.confed.get(self.nat_confed(t), self.confed["unknown"])
-                o = self.S["model"].get("national_strength_scale", scale) * (s - 50) / 50
-                pri[t] = (o, o)
-                continue
-            o = scale * (s - 50) / 50
+                o = M.get("national_strength_scale", M["league_strength_scale"]) * (s - 50) / 50
             pri[t] = (o, o)
         return pri
 
@@ -589,105 +866,246 @@ class Build:
                 return confed
         return "unknown"
 
-    def predict(self, cands):
+    def pool_matches(self, pool, ref_ts):
+        M = self.S["model"]
+        nat = pool.endswith("nat")
+        since = ref_ts - (M["international_window_days"] if nat else 450) * 86400
+        cur_start = ref_ts - 330 * 86400
+        out = []
+        for v in self.store.matches.values():
+            if v[7] != "finished" or v[5] is None or v[6] is None or not (since <= v[2] < ref_ts):
+                continue
+            if self.pool_of(v[0]) != pool:
+                continue
+            w = 1.0 if (nat or v[2] >= cur_start) else M["previous_season_weight"]
+            out.append({"home": v[3], "away": v[4], "gh": v[5], "ga": v[6], "ts": v[2], "w": w})
+        return out
+
+    def fit_ratings(self, pool, ref_ts, extra_teams=(), half_life=None, matches=None):
+        M = self.S["model"]
+        nat = pool.endswith("nat")
+        if matches is None:
+            matches = self.pool_matches(pool, ref_ts)
+        teams = {t for m in matches for t in (m["home"], m["away"])} | set(extra_teams)
+        pri = self.priors_for(pool, teams)
+        hl = half_life or (M["international_half_life_days"] if nat else self.ms["half_life"])
+        long = fit_pool(matches, pri, M["prior_spread"], hl, ref_ts)
+        long_pri = {t: (long["att"][t], long["def"][t]) for t in long["att"]}
+        short = fit_pool(matches, long_pri, M["form_spread"], M["form_half_life_days"], ref_ts, iters=25)
+        games = Counter()
+        since = ref_ts - (M["international_window_days"] if nat else 330) * 86400
+        for m in matches:
+            if m["ts"] >= since:
+                games[m["home"]] += 1
+                games[m["away"]] += 1
+        return {"long": long, "short": short, "pri": pri, "games": games, "matches": matches, "nat": nat}
+
+    def lambdas(self, fit, home, away, neutral, wf=None):
+        wf = self.ms["form_weight"] if wf is None else wf
+        L, Sh, pri = fit["long"], fit["short"], fit["pri"]
+        p0 = (0.0, 0.0)
+
+        def team(t):
+            a = (1 - wf) * L["att"].get(t, pri.get(t, p0)[0]) + wf * Sh["att"].get(t, pri.get(t, p0)[0])
+            d = (1 - wf) * L["def"].get(t, pri.get(t, p0)[1]) + wf * Sh["def"].get(t, pri.get(t, p0)[1])
+            return a, d
+        mu = (1 - wf) * L["mu"] + wf * Sh["mu"]
+        hadv = 0 if neutral else (1 - wf) * L["home"] + wf * Sh["home"]
+        ah, dh = team(home)
+        aa, da = team(away)
+        return math.exp(mu + hadv + ah - da), math.exp(mu + aa - dh), (ah, dh), (aa, da)
+
+    # ---------------- predictions ----------------
+    def predict(self, items, fit):
         S, M = self.S, self.S["model"]
-        wf = S["weights"]["form"]
-        pool_of = {i: self.comp_by_no[no]["pool"] for i, no in self.of_to_no.items()}
-        since = self.ref_ts - 450 * 86400
-        pools = defaultdict(list)
-        for no, ms in cands.items():
-            if self.cov.get(no, {}).get("status") in ("omitted_budget", "blocked_plan", "error", "not_available"):
-                continue
-            for m in ms:
-                pools[self.comp_by_no[no]["pool"]].append((no, m))
-        preds = []
-        cur_season_start = self.ref_ts - 330 * 86400
-        for pool, items in pools.items():
-            matches = []
-            for v in self.store.matches.values():
-                if v[7] != "finished" or v[5] is None or v[6] is None or not (since <= v[2] < self.ref_ts):
-                    continue
-                if pool_of.get(v[0], "men_club") != pool:
-                    continue
-                w = 1.0 if v[2] >= cur_season_start else M["previous_season_weight"]
-                matches.append({"home": v[3], "away": v[4], "gh": v[5], "ga": v[6], "ts": v[2], "w": w})
-            teams = {t for m in matches for t in (m["home"], m["away"])} | {t for _, m in items for t in (m["home"], m["away"])}
-            pri = self.priors_for(pool, teams)
-            self.log(f"  fitting {pool}: {len(matches)} results, {len(teams)} teams")
-            long = fit_pool(matches, pri, M["prior_spread"], M["strength_half_life_days"], self.ref_ts)
-            long_pri = {t: (long["att"][t], long["def"][t]) for t in long["att"]}
-            short = fit_pool(matches, long_pri, M["form_spread"], M["form_half_life_days"], self.ref_ts, iters=25)
-            games = Counter()
-            for m in matches:
-                if m["ts"] >= cur_season_start:
-                    games[m["home"]] += 1
-                    games[m["away"]] += 1
-            mu = (1 - wf) * long["mu"] + wf * short["mu"]
-            hadv = (1 - wf) * long["home"] + wf * short["home"]
-
-            def team(t):
-                a = (1 - wf) * long["att"].get(t, pri[t][0]) + wf * short["att"].get(t, pri[t][0])
-                d = (1 - wf) * long["def"].get(t, pri[t][1]) + wf * short["def"].get(t, pri[t][1])
-                return a, d
-
-            for no, m in items:
-                c = self.comp_by_no[no]
-                ah, dh = team(m["home"])
-                aa, da = team(m["away"])
-                h = 0 if no in (41, 43, 46, 47, 49, 52) else hadv
-                lh = math.exp(mu + h + ah - da)
-                la = math.exp(mu + aa - dh)
-                p00 = math.exp(-(lh + la))
-                limited = min(games[m["home"]], games[m["away"]]) < M["limited_data_games"]
-                score = score_from_p00(p00, S["score_scale"])
+        out = []
+        group = "intl" if fit["nat"] else "club"
+        lim_n = M["limited_data_games_international"] if fit["nat"] else M["limited_data_games"]
+        tn = lambda t: (self.store.teams.get(t) or [t])[0] or t
+        for no, m in items:
+            c = self.comp_by_no[no]
+            lh, la, (ah, dh), (aa, da) = self.lambdas(fit, m["home"], m["away"], no in NEUTRAL_COMPS)
+            p = calibrated(lh, la, group, self.ms)
+            sec = section_scores(p, S)
+            limited = min(fit["games"][m["home"]], fit["games"][m["away"]]) < lim_n
+            for s in sec.values():
                 if limited:
-                    score *= M["limited_data_score_factor"]
-                tags = ["limited_data"] if limited else []
-                if not m["time_known"]:
-                    tags.append("time_tbc")
-                tn = lambda t: (self.store.teams.get(t) or [t])[0] or t
-                preds.append({
-                    "fid": m["id"], "ts": m["ts"], "comp_no": no, "comp": c["name"], "group": c["group"],
-                    "round": m["round"], "league_name": self.store.comp_name(m["comp"]),
-                    "home": {"id": m["home"], "name": tn(m["home"]), "games": games[m["home"]],
-                             "att": rating(ah, 0.6), "def": rating(dh, 0.6), "ovr": rating(ah + dh, 0.9)},
-                    "away": {"id": m["away"], "name": tn(m["away"]), "games": games[m["away"]],
-                             "att": rating(aa, 0.6), "def": rating(da, 0.6), "ovr": rating(aa + da, 0.9)},
-                    "xg_home": round(lh, 2), "xg_away": round(la, 2), "p00": round(p00, 4), "p00_model": round(p00, 4),
-                    "p00_market": None, "market_used": False,
-                    "score": round(max(1.0, min(100.0, score)), 2),
-                    "odds": None, "bookie": None, "implied": None, "edge": None, "tags": tags,
-                })
-        preds.sort(key=lambda p: (-p["score"], p["ts"]))
-        for i, p in enumerate(preds):
-            p["rank"] = i + 1
-            p["top10"] = i < S["top_n"]
-        return preds
+                    s["score"] *= M["limited_data_score_factor"]
+                s["score"] = round(max(1.0, min(100.0, s["score"])), 2)
+                s["p"] = round(s["p"], 4)
+            tags = (["limited_data"] if limited else []) + ([] if m.get("time_known", True) else ["time_tbc"])
+            if not sec["goals"]["listed"]:
+                tags.append("too_short")
+            out.append({
+                "fid": m["id"], "ts": m["ts"], "comp_no": no, "comp": c["name"], "intl": fit["nat"],
+                "round": m.get("round", ""), "league_name": self.store.comp_name(m["comp"]),
+                "home": {"name": tn(m["home"]), "games": fit["games"][m["home"]],
+                         "att": round(rating(ah, 0.6)), "def": round(rating(dh, 0.6)), "ovr": round(rating(ah + dh, 0.9))},
+                "away": {"name": tn(m["away"]), "games": fit["games"][m["away"]],
+                         "att": round(rating(aa, 0.6)), "def": round(rating(da, 0.6)), "ovr": round(rating(aa + da, 0.9))},
+                "xg_home": round(lh, 2), "xg_away": round(la, 2), "raw": [round(lh, 4), round(la, 4)],
+                "p00": round(p["p00"], 4), "pw_home": round(p["w"], 4), "pd": round(p["d"], 4), "pw_away": round(p["l"], 4),
+                "p_home_score": round(p["hs"], 4), "p_away_score": round(p["as"], 4), "p_btts": round(p["btts"], 4),
+                "tags": tags, "sec": sec,
+            })
+        return out
 
-    # ---------------- tracking ----------------
-    def settle(self, history):
-        for fid, g in history["games"].items():
-            if g.get("result") is not None:
+    # ---------------- replay past dates (gives the self-adjustment data to learn from straight away) ----------------
+    def replay_week(self, start_ts, plog):
+        end_ts = start_ts + 7 * 86400
+        items = defaultdict(list)
+        for mid, v in self.store.matches.items():
+            if not (start_ts <= v[2] < end_ts) or v[7] != "finished" or v[5] is None:
                 continue
-            v = self.store.matches.get(fid)
-            if v and v[7] == "finished" and v[5] is not None:
-                g["result"] = {"h": v[5], "a": v[6], "status": "FT"}
-            elif v and v[7] in ("postponed", "cancelled"):
-                g["result"] = {"status": v[7], "void": True}
-            elif g["ts"] < self.ref_ts - 4 * 86400:
-                g["result"] = {"status": "no result", "void": True}
+            no = self.of_to_no.get(v[0])
+            if no is None:
+                continue
+            items[self.comp_by_no[no]["pool"]].append((no, {"id": mid, "comp": v[0], "ts": v[2], "home": v[3], "away": v[4],
+                                                             "round": v[8]}))
+        n = 0
+        for pool, its in items.items():
+            fit = self.fit_ratings(pool, start_ts)
+            if len(fit["matches"]) < 40:
+                continue
+            for p in self.predict(its, fit):
+                v = self.store.matches[p["fid"]]
+                plog.put(p["fid"], log_entry(p, [v[5], v[6]]), replay=True)
+                n += 1
+        return n
+
+    # ---------------- daily tuning of form weight and fade speed ----------------
+    def tune_daily(self, cal):
+        """Score alternative form weights and fade speeds on the last 3 days' results; switch when one is clearly better."""
+        t0 = self.ref_ts - 3 * 86400
+        games = [v for v in self.store.matches.values()
+                 if t0 <= v[2] < self.ref_ts and v[7] == "finished" and v[5] is not None and self.of_to_no.get(v[0])
+                 and self.pool_of(v[0]) == "men_club"]
+        if len(games) < 15:
+            return
+        matches = self.pool_matches("men_club", t0)
+        hl, wf = self.ms["half_life"], self.ms["form_weight"]
+        hls = sorted({max(90, round(hl / 1.25)), hl, min(540, round(hl * 1.25))})
+        wfs = sorted({round(max(0.0, wf - 0.05), 2), round(wf, 2), round(min(0.4, wf + 0.05), 2)})
+
+        def ll(fit, w):
+            tot = 0.0
+            for v in games:
+                lh, la, _, _ = self.lambdas(fit, v[3], v[4], self.of_to_no.get(v[0]) in NEUTRAL_COMPS, wf=w)
+                tot += math.log(max(poisson_pmf(v[5], lh) * poisson_pmf(v[6], la), 1e-12))
+            return tot
+        tun = self.ms.setdefault("tuning", {})
+        for kind, cands in (("half_life", hls), ("form_weight", wfs)):
+            acc = tun.setdefault(kind, {"days": 0, "n": 0, "ll": {}})
+            if kind == "half_life":
+                scores = {str(h): ll(self.fit_ratings("men_club", t0, half_life=h, matches=matches), wf) for h in cands}
+            else:
+                fit = self.fit_ratings("men_club", t0, matches=matches)
+                scores = {str(w): ll(fit, w) for w in cands}
+            for k in list(acc["ll"]):
+                if k not in scores:
+                    del acc["ll"][k]
+            for k, v in scores.items():
+                acc["ll"][k] = acc["ll"].get(k, 0.0) * 0.97 + v
+            acc["days"] += 1
+            acc["n"] += len(games)
+            cur = str(hl if kind == "half_life" else round(wf, 2))
+            if acc["days"] >= 21 and acc["n"] >= 600 and cur in acc["ll"]:
+                best = max(acc["ll"], key=acc["ll"].get)
+                if best != cur and (acc["ll"][best] - acc["ll"][cur]) / max(acc["n"], 1) > 0.0005:
+                    if kind == "half_life":
+                        self.ms["half_life"] = int(float(best))
+                        cal.note(f"Older games now fade {'more slowly' if int(float(best)) > hl else 'faster'}: "
+                                 f"strength half-life {hl} → {int(float(best))} days (better fit over {acc['n']} games).")
+                    else:
+                        self.ms["form_weight"] = float(best)
+                        cal.note(f"Recent form now counts {'more' if float(best) > wf else 'less'}: "
+                                 f"{round(wf * 100)}% → {round(float(best) * 100)}% (better fit over {acc['n']} games).")
+                    tun[kind] = {"days": 0, "n": 0, "ll": {}}
+
+    def adjust_league_strengths(self, cal):
+        """Move each listed league's starting strength a little towards what cross-league results say."""
+        M = self.S["model"]
+        matches = self.pool_matches("men_club", self.ref_ts)
+        if len(matches) < 200:
+            return
+        fit = self.fit_ratings("men_club", self.ref_ts, matches=matches)
+        league_of = {}
+        for m in matches:
+            for t in (m["home"], m["away"]):
+                if t not in league_of:
+                    league_of[t] = self.home_league(t)
+        cross = Counter()
+        for m in matches:
+            a, b = league_of.get(m["home"]), league_of.get(m["away"])
+            if a and b and a != b:
+                cross[a] += 1
+                cross[b] += 1
+        moved = []
+        adj = self.ms.setdefault("league_adj", {})
+        for c in self.comps:
+            cid = c.get("openfoot_id")
+            if not cid or c["kind"] != "league" or "strength" not in c or cross[cid] < 10:
+                continue
+            ts = [t for t, l in league_of.items() if l == cid]
+            if len(ts) < 6:
+                continue
+            avg = sum(fit["long"]["att"].get(t, 0) + fit["long"]["def"].get(t, 0) for t in ts) / (2 * len(ts))
+            implied = 50 + 50 * avg / M["league_strength_scale"]
+            target = max(-15, min(15, implied - c["strength"]))
+            old = adj.get(cid, 0.0)
+            new = round(old + 0.1 * (target - old), 2)
+            adj[cid] = new
+            if int(abs(new)) != int(abs(old)) or (new > 0) != (old > 0) and abs(new) >= 1:
+                moved.append(f"{c['name']} {'+' if new >= 0 else ''}{new:.1f}")
+        if moved:
+            cal.note("League strengths nudged by cross-league results: " + ", ".join(moved[:5]) + ".")
 
 
-def record_history(history, preds, settings):
-    for p in preds:
-        g = history["games"].get(str(p["fid"]), {})
-        g.update({"ts": p["ts"], "comp": p["comp"], "home": p["home"]["name"], "away": p["away"]["name"],
-                  "score": p["score"], "p00": p["p00"], "odds": p["odds"], "top10": p["top10"], "rank": p["rank"]})
-        g.setdefault("result", None)
-        history["games"][str(p["fid"])] = g
-    cutoff = time.time() - settings["history_days"] * 86400
-    history["games"] = {k: v for k, v in history["games"].items() if v["ts"] >= cutoff}
-    return history
+def rank_sections(preds, S):
+    for key in SECTIONS:
+        cand = sorted([p for p in preds if p["sec"][key]["listed"]], key=lambda p: (-p["sec"][key]["score"], p["ts"]))
+        n = 0
+        for r, p in enumerate(cand):
+            s = p["sec"][key]
+            s["rank"] = r + 1
+            mn = S["min_score_international"] if p["intl"] else S["min_score"]
+            s["pick"] = s["score"] >= mn and n < S["top_n"]
+            n += s["pick"]
+        for p in preds:
+            if not p["sec"][key]["listed"]:
+                p["sec"][key].update(rank=None, pick=False)
+
+
+def log_entry(p, result=None):
+    return {"ts": p["ts"], "c": p["comp_no"], "cn": p["comp"], "i": p["intl"], "h": p["home"]["name"], "a": p["away"]["name"],
+            "lh": p["raw"][0], "la": p["raw"][1], "lim": "limited_data" in p["tags"],
+            "p": {"p00": p["p00"], "w": p["pw_home"], "d": p["pd"], "l": p["pw_away"], "btts": p["p_btts"]},
+            "s": {k: [v["score"], v.get("rank"), bool(v.get("pick")), v.get("team")] for k, v in p["sec"].items()},
+            "r": result}
+
+
+def record_summary(plog, ref_ts, S):
+    """Section hit rates for the Record screen (real picks only, not replays)."""
+    secs = {k: {"d30": {"won": 0, "lost": 0, "void": 0, "pending": 0}, "all": {"won": 0, "lost": 0, "void": 0, "pending": 0}}
+            for k in SECTIONS}
+    recent = defaultdict(list)
+    for fid, e in plog.entries(ref_ts - S["history_days"] * 86400, ref_ts + 2 * 86400):
+        if e.get("rp"):
+            continue
+        for k, (score, rank, pick, team) in e["s"].items():
+            if not pick:
+                continue
+            r = e.get("r")
+            res = "pending" if r is None else "void" if r == "void" else ("won" if pick_won(k, team, r[0], r[1]) else "lost")
+            secs[k]["all"][res] += 1
+            if e["ts"] >= ref_ts - 30 * 86400:
+                secs[k]["d30"][res] += 1
+            if e["ts"] >= ref_ts - 7 * 86400:
+                day = datetime.fromtimestamp(e["ts"], timezone.utc).date().isoformat()
+                recent[day].append({"ts": e["ts"], "h": e["h"], "a": e["a"], "comp": e["cn"], "section": k, "team": team,
+                                    "score": score, "rank": rank, "result": r, "res": res})
+    days = [{"date": d, "picks": sorted(v, key=lambda x: (x["ts"], x["section"]))} for d, v in sorted(recent.items(), reverse=True)]
+    return {"sections": secs, "recent": days}
 
 
 def build_site():
@@ -695,7 +1113,7 @@ def build_site():
         shutil.rmtree(SITE)
     shutil.copytree(WEB, SITE)
     (SITE / "data").mkdir(exist_ok=True)
-    for name in ("today.json", "coverage.json", "history.json"):
+    for name in ("today.json", "coverage.json", "record.json"):
         if (DATA / name).exists():
             shutil.copy(DATA / name, SITE / "data" / name)
 
@@ -749,12 +1167,12 @@ def main(argv=None):
     R = settings["requests"]
     print(f"Goalscraper: window starts {now_local:%a %d %b %Y %H:%M} Irish time")
     store = Store(DATA / "store.json")
-    history = load_json(DATA / "history.json", {"games": {}})
-    history.setdefault("games", {})
-    if history.get("mode") == "rehearsal":
-        history = {"games": {}}
-    history["mode"] = "live"
-    build = Build(api, settings, comp_doc, store, ref)
+    ms = load_json(DATA / "model_state.json", None) or default_state(settings)
+    for k, v in default_state(settings).items():
+        ms.setdefault(k, v)
+    build = Build(api, settings, comp_doc, store, ref, ms)
+    plog = PredLog(DATA / "log")
+    plog.load_range(build.ref_ts - 400 * 86400, build.end_ts)
 
     days_left = max(1, (date(ref.year + (ref.month == 12), ref.month % 12 + 1, 1) - ref.date()).days)
 
@@ -767,14 +1185,15 @@ def main(argv=None):
     fatal = None
     try:
         build.load_catalogue()
-        preds, stats = build.run(history)
+        preds, stats = build.run()
     except BudgetExhausted:
         fatal = "The monthly request quota is used up, so no games could be scored. It resets on the 1st."
     except PlanBlocked as e:
         fatal = f"OpenFootAPI refused the key: {e}"
     except ApiError as e:
         fatal = f"OpenFootAPI error: {e}"
-    store.save(keep_after_ts=build.ref_ts - 500 * 86400)
+    nat_ids = {i for no, ids in build.comp_ids.items() if build.comp_by_no[no]["pool"].endswith("nat") for i in ids}
+    store.save(keep_after_ts=build.ref_ts - 500 * 86400, keep_longer=nat_ids, longer_after_ts=build.ref_ts - 1200 * 86400)
     if fatal:
         print("FAILED:", fatal)
         cov = load_json(DATA / "coverage.json", {})
@@ -786,7 +1205,48 @@ def main(argv=None):
         gh_output(ran="true" if prev else "false")
         return 1
 
-    history = record_history(history, preds, settings)
+    # ---- store today's predictions, settle earlier ones, learn from results ----
+    for p in preds:
+        plog.put(p["fid"], log_entry(p))
+    plog.settle(store, build.ref_ts)
+    cal = Calibrator(ms, plog, build.ref_ts, print)
+    if settings.get("self_adjust", True):
+        settled = sum(1 for _, e in plog.entries(build.ref_ts - 365 * 86400, build.ref_ts) if isinstance(e.get("r"), list))
+        back = ms.get("replay_back_to") or build.ref_ts - 7 * 86400
+        weeks = 0
+        while settled < 3000 and back > build.ref_ts - 140 * 86400 and weeks < 2:
+            back -= 7 * 86400
+            n = build.replay_week(back, plog)
+            settled += n
+            weeks += 1
+            print(f"  replayed the week from {datetime.fromtimestamp(back, timezone.utc):%d %b}: {n} games")
+        ms["replay_back_to"] = back
+        cal.step_probabilities()
+        try:
+            build.tune_daily(cal)
+            build.adjust_league_strengths(cal)
+        except Exception as e:                    # tuning must never stop the daily list
+            print("  tuning skipped:", repr(e))
+    cal.model_check()
+    if cal.changes:
+        ms["version"] = ms.get("version", 1) + 1
+        for c in cal.changes:
+            ms["changes"].insert(0, {"date": now_local.date().isoformat(), "text": c})
+            print("  model:", c)
+    elif settings.get("self_adjust", True):
+        ms["changes"].insert(0, {"date": now_local.date().isoformat(), "text": "Checked against results: no changes needed."})
+    # keep the change log short, and only one 'no changes' line in a row
+    out, last_none = [], False
+    for c in ms["changes"]:
+        none = c["text"].startswith("Checked against results")
+        if none and last_none:
+            continue
+        out.append(c)
+        last_none = none
+    ms["changes"] = out[:40]
+    plog.save()
+    save_json(DATA / "model_state.json", ms)
+
     gen = datetime.now(timezone.utc)
     disc = state.setdefault("discovered", {})
     for no in build.discovered:
@@ -797,36 +1257,47 @@ def main(argv=None):
                  if (now_local.date() - date.fromisoformat(disc[str(no)])).days <= 7]
     if new_names:
         print("New on OpenFootAPI and now included:", ", ".join(new_names))
+    for p in preds:
+        p.pop("raw", None)
     today = {
-        "app": "Goalscraper", "generated_utc": gen.isoformat(), "mode": "live", "source": "OpenFootAPI",
-        "odds_enabled": False, "plan": api.plan, "window_start_ts": build.ref_ts, "window_end_ts": build.end_ts,
-        "timezone": settings["timezone"], "min_odds": settings["min_odds"], "top_n": settings["top_n"],
-        "weights": {"form": settings["weights"]["form"], "market": 0}, "games": preds,
-        "new_competitions": new_names,
+        "app": "Goalscraper", "generated_utc": gen.isoformat(), "source": "OpenFootAPI", "plan": api.plan,
+        "window_start_ts": build.ref_ts, "window_end_ts": build.end_ts, "timezone": settings["timezone"],
+        "top_n": settings["top_n"], "min_club": settings["min_score"], "min_intl": settings["min_score_international"],
+        "ballon_min": settings["sections"]["ballon"]["min_favourite"],
+        "misses_longest": settings["sections"]["misses"]["longest_price"],
+        "goals_max": settings["sections"]["goals"]["max_chance_of_goal"],
+        "games": sorted(preds, key=lambda p: p["ts"]), "new_competitions": new_names,
     }
     comps_out = []
     for c in sorted(comp_doc["competitions"], key=lambda c: (-c["value"], c["prestige"], c["no"])):
         cv = build.cov.get(c["no"], {"status": "no_games", "games": 0, "note": ""})
         ids = build.comp_ids.get(c["no"]) or [i for n in c.get("virtual_of", []) for i in build.comp_ids.get(n, [])]
         comps_out.append({"no": c["no"], "name": c["name"], "group": c["group"], "value": c["value"],
-                          "prestige": c["prestige"], **cv, "with_odds": 0, "newly_found": c["no"] in recent,
-                          "matched": [{"id": i, "name": store.comp_name(i)} for i in ids if i], "matched_count": len(ids),
-                          "odds_supported": None})
+                          "prestige": c["prestige"], **cv, "newly_found": c["no"] in recent,
+                          "matched": [{"id": i, "name": store.comp_name(i)} for i in ids if i], "matched_count": len(ids)})
     coverage = {
-        "generated_utc": gen.isoformat(), "mode": "live", "plan": api.plan, "source": "OpenFootAPI",
+        "generated_utc": gen.isoformat(), "plan": api.plan, "source": "OpenFootAPI",
         "requests_used": api.used, "requests_available": api.limit, "monthly_remaining": api.quota_remaining,
         "games_scored": len(preds), **stats, "competitions": comps_out, "notes": build.notes[:20], "last_error": None,
+        "model": {"version": ms["version"], "changes": ms["changes"][:15], "check": ms.get("check", []),
+                  "form_weight": ms["form_weight"], "half_life": ms["half_life"]},
     }
+    record = record_summary(plog, build.ref_ts, settings)
+    record["check"] = ms.get("check", [])
+    record["generated_utc"] = gen.isoformat()
     save_json(DATA / "today.json", today)
     save_json(DATA / "coverage.json", coverage)
-    save_json(DATA / "history.json", history)
+    save_json(DATA / "record.json", record)
     state.update({"last_run_local_date": now_local.date().isoformat(), "last_run_utc": gen.isoformat()})
     save_json(DATA / "state.json", state)
     build_site()
     gh_output(ran="true")
-    print(f"Plan: {api.plan}. Scored {len(preds)} games. Requests used: {api.used} (run limit {api.limit}). Monthly left: {api.quota_remaining}.")
-    for p in preds[: settings["top_n"]]:
-        print(f"  {p['score']:6.2f}  P(0-0) {p['p00']*100:4.1f}%  {p['home']['name']} v {p['away']['name']}  ({p['comp']})")
+    print(f"Plan: {api.plan}. Scored {len(preds)} games. Requests used: {api.used} (run limit {api.limit}). "
+          f"Monthly left: {api.quota_remaining}.")
+    for key in SECTIONS:
+        picks = sorted([p for p in preds if p["sec"][key]["pick"]], key=lambda p: p["sec"][key]["rank"])
+        print(f"  {key:6} {len(picks):2} picks: " + ", ".join(f"{p['home']['name']} v {p['away']['name']} {p['sec'][key]['score']:.0f}"
+                                                          for p in picks[:4]))
     return 0
 
 
