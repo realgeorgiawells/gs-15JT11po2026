@@ -1000,7 +1000,1435 @@
    "Iraq": 62,
    "Jamaica": 62,
    "UAE": 60,
+   "New Zealand": 58,{
+ "_about": [
+  "Your 52 competitions. 'value' is your priority (higher = kept first if the request budget runs short).",
+  "'prestige' breaks ties between equal values (1 = kept first).",
+  "'strength' (0-100) is the starting estimate of how strong teams in that league are, before results adjust it.",
+  "'openfoot_id' is the competition's ID in OpenFootAPI. null = not available on OpenFootAPI's free plan (shown on the Coverage tab).",
+  "'watch' = how Goalscraper spots a missing competition if OpenFootAPI adds it later (checked every 3 days); it is then included automatically."
+ ],
+ "competitions": [
+  {
+   "no": 1,
+   "group": "England",
+   "name": "Premier League",
+   "value": 100,
+   "prestige": 4,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "England",
+   "strength": 100,
+   "openfoot_id": "comp_premier_league_eng"
+  },
+  {
+   "no": 2,
+   "group": "England",
+   "name": "Championship",
+   "value": 99,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "England",
+   "strength": 72,
+   "openfoot_id": "comp_championship_eng"
+  },
+  {
+   "no": 3,
+   "group": "England",
+   "name": "League One",
+   "value": 98,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "England",
+   "strength": 60,
+   "openfoot_id": "comp_league_one_eng"
+  },
+  {
+   "no": 4,
+   "group": "England",
+   "name": "League Two",
+   "value": 97,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "England",
+   "strength": 52,
+   "openfoot_id": "comp_league_two_eng"
+  },
+  {
+   "no": 5,
+   "group": "England",
+   "name": "National League",
+   "value": 90,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "England",
+   "strength": 44,
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "^national league$"
+    ],
+    "where": [
+     "england",
+     "_eng"
+    ]
+   }
+  },
+  {
+   "no": 6,
+   "group": "Scotland",
+   "name": "Premiership",
+   "value": 90,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Scotland",
+   "strength": 62,
+   "openfoot_id": "comp_scottish_prem_sco"
+  },
+  {
+   "no": 7,
+   "group": "Scotland",
+   "name": "Championship",
+   "value": 70,
+   "prestige": 6,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Scotland",
+   "strength": 45,
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "championship"
+    ],
+    "where": [
+     "scotland",
+     "_sco"
+    ]
+   }
+  },
+  {
+   "no": 8,
+   "group": "Scotland",
+   "name": "League One",
+   "value": 70,
+   "prestige": 7,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Scotland",
+   "strength": 36,
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "league one"
+    ],
+    "where": [
+     "scotland",
+     "_sco"
+    ]
+   }
+  },
+  {
+   "no": 9,
+   "group": "Scotland",
+   "name": "League Two",
+   "value": 70,
+   "prestige": 8,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Scotland",
+   "strength": 30,
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "league two"
+    ],
+    "where": [
+     "scotland",
+     "_sco"
+    ]
+   }
+  },
+  {
+   "no": 10,
+   "group": "Other top-10 UEFA nations",
+   "name": "Serie A (Italy)",
+   "value": 75,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Italy",
+   "strength": 90,
+   "openfoot_id": "comp_serie_a_it"
+  },
+  {
+   "no": 11,
+   "group": "Other top-10 UEFA nations",
+   "name": "La Liga (Spain)",
+   "value": 80,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Spain",
+   "strength": 92,
+   "openfoot_id": "comp_laliga_es"
+  },
+  {
+   "no": 12,
+   "group": "Other top-10 UEFA nations",
+   "name": "Bundesliga (Germany)",
+   "value": 71,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Germany",
+   "strength": 89,
+   "openfoot_id": "comp_bundesliga_de"
+  },
+  {
+   "no": 13,
+   "group": "Other top-10 UEFA nations",
+   "name": "Ligue 1 (France)",
+   "value": 71,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "France",
+   "strength": 84,
+   "openfoot_id": "comp_ligue_1_fr"
+  },
+  {
+   "no": 14,
+   "group": "Other top-10 UEFA nations",
+   "name": "Primeira Liga (Portugal)",
+   "value": 71,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Portugal",
+   "strength": 78,
+   "openfoot_id": "comp_primeira_liga_pt"
+  },
+  {
+   "no": 15,
+   "group": "Other top-10 UEFA nations",
+   "name": "Belgian Pro League",
+   "value": 65,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Belgium",
+   "strength": 72,
+   "openfoot_id": "comp_pro_league_be"
+  },
+  {
+   "no": 16,
+   "group": "Other top-10 UEFA nations",
+   "name": "Eredivisie (Netherlands)",
+   "value": 70,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Netherlands",
+   "strength": 76,
+   "openfoot_id": "comp_eredivisie_nl"
+  },
+  {
+   "no": 17,
+   "group": "Other top-10 UEFA nations",
+   "name": "Süper Lig (Türkiye)",
+   "value": 70,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Turkey",
+   "strength": 70,
+   "openfoot_id": "comp_super_lig_tr"
+  },
+  {
+   "no": 18,
+   "group": "Other top-10 UEFA nations",
+   "name": "Super League (Greece)",
+   "value": 65,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Greece",
+   "strength": 66,
+   "openfoot_id": "comp_super_league_grc"
+  },
+  {
+   "no": 19,
+   "group": "Other domestic leagues",
+   "name": "Allsvenskan (Sweden)",
+   "value": 80,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Sweden",
+   "strength": 58,
+   "openfoot_id": "comp_allsvenskan_swe"
+  },
+  {
+   "no": 20,
+   "group": "Other domestic leagues",
+   "name": "League of Ireland Premier Division",
+   "value": 100,
+   "prestige": 12,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Ireland",
+   "strength": 44,
+   "openfoot_id": "comp_premier_division_irl"
+  },
+  {
+   "no": 21,
+   "group": "Other domestic leagues",
+   "name": "League of Ireland First Division",
+   "value": 100,
+   "prestige": 13,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Ireland",
+   "strength": 32,
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "first division"
+    ],
+    "where": [
+     "ireland",
+     "_irl"
+    ]
+   }
+  },
+  {
+   "no": 22,
+   "group": "Other domestic leagues",
+   "name": "MLS",
+   "value": 70,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "USA",
+   "strength": 66,
+   "openfoot_id": "comp_mls_usa"
+  },
+  {
+   "no": 23,
+   "group": "Other domestic leagues",
+   "name": "A-League",
+   "value": 70,
+   "prestige": 5,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Australia",
+   "strength": 52,
+   "openfoot_id": "comp_a_league_aus"
+  },
+  {
+   "no": 24,
+   "group": "Other domestic leagues",
+   "name": "J-League (J1)",
+   "value": 70,
+   "prestige": 4,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Japan",
+   "strength": 64,
+   "openfoot_id": "comp_j1_league_jpn"
+  },
+  {
+   "no": 25,
+   "group": "Women's domestic",
+   "name": "Women's Super League (England)",
+   "value": 85,
+   "prestige": 1,
+   "pool": "women_club",
+   "kind": "league",
+   "country": "England",
+   "strength": 85,
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "women s super league",
+     "^wsl",
+     "super league women",
+     "fa wsl"
+    ],
+    "where": [
+     "england",
+     "_eng"
+    ]
+   }
+  },
+  {
+   "no": 26,
+   "group": "Women's domestic",
+   "name": "League of Ireland Women's Premier Division",
+   "value": 85,
+   "prestige": 4,
+   "pool": "women_club",
+   "kind": "league",
+   "country": "Ireland",
+   "strength": 45,
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "women"
+    ],
+    "where": [
+     "ireland",
+     "_irl"
+    ]
+   }
+  },
+  {
+   "no": 27,
+   "group": "UEFA club competitions",
+   "name": "Champions League",
+   "value": 100,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "rounds": "main",
+   "openfoot_id": "comp_uefa_champions_league"
+  },
+  {
+   "no": 28,
+   "group": "UEFA club competitions",
+   "name": "Europa League",
+   "value": 100,
+   "prestige": 6,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "rounds": "main",
+   "openfoot_id": "comp_uefa_europa_league"
+  },
+  {
+   "no": 29,
+   "group": "UEFA club competitions",
+   "name": "Conference League",
+   "value": 100,
+   "prestige": 10,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "rounds": "main",
+   "openfoot_id": "comp_uefa_conference_league"
+  },
+  {
+   "no": 30,
+   "group": "UEFA club competitions",
+   "name": "UEFA club qualifying rounds (all three)",
+   "value": 100,
+   "prestige": 11,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "rounds": "qualifying",
+   "virtual_of": [
+    27,
+    28,
+    29
+   ],
+   "openfoot_id": null
+  },
+  {
+   "no": 31,
+   "group": "UEFA club competitions",
+   "name": "Women's Champions League",
+   "value": 90,
+   "prestige": 1,
+   "pool": "women_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "champions league women",
+     "women s champions league"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 32,
+   "group": "UEFA club competitions",
+   "name": "Women's Europa Cup",
+   "value": 85,
+   "prestige": 3,
+   "pool": "women_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "europa cup"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 33,
+   "group": "Club competitions in other confederations",
+   "name": "Copa Libertadores",
+   "value": 75,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": "comp_copa_libertadores"
+  },
+  {
+   "no": 34,
+   "group": "Club competitions in other confederations",
+   "name": "Copa Sudamericana",
+   "value": 75,
+   "prestige": 4,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": "comp_copa_sudamericana"
+  },
+  {
+   "no": 35,
+   "group": "Club competitions in other confederations",
+   "name": "CONCACAF Champions Cup",
+   "value": 50,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": "comp_concacaf_champions_cup"
+  },
+  {
+   "no": 36,
+   "group": "Club competitions in other confederations",
+   "name": "CAF Champions League",
+   "value": 50,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "caf champions league"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 37,
+   "group": "Club competitions in other confederations",
+   "name": "CAF Confederation Cup",
+   "value": 50,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "confederation cup"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 38,
+   "group": "Club competitions in other confederations",
+   "name": "AFC Champions League Elite",
+   "value": 75,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": "comp_afc_champions_league"
+  },
+  {
+   "no": 39,
+   "group": "Club competitions in other confederations",
+   "name": "AFC Champions League Two",
+   "value": 75,
+   "prestige": 5,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "champions league two",
+     "afc cup"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 40,
+   "group": "Club competitions in other confederations",
+   "name": "OFC Champions League",
+   "value": 50,
+   "prestige": 4,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "ofc champions league"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 41,
+   "group": "International, men's",
+   "name": "World Cup (finals)",
+   "value": 100,
+   "prestige": 2,
+   "pool": "men_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": "comp_fifa_world_cup"
+  },
+  {
+   "no": 42,
+   "group": "International, men's",
+   "name": "World Cup qualifiers (all confederations)",
+   "value": 100,
+   "prestige": 8,
+   "pool": "men_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "world cup qualif"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 43,
+   "group": "International, men's",
+   "name": "European Championship (finals)",
+   "value": 100,
+   "prestige": 3,
+   "pool": "men_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "^(uefa )?(euro|european championship)( 20[0-9][0-9])?$"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 44,
+   "group": "International, men's",
+   "name": "European Championship qualifiers",
+   "value": 100,
+   "prestige": 9,
+   "pool": "men_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "euro.*qualif",
+     "european championship.*qualif"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 45,
+   "group": "International, men's",
+   "name": "Nations League",
+   "value": 100,
+   "prestige": 7,
+   "pool": "men_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": "comp_uefa_nations_league"
+  },
+  {
+   "no": 46,
+   "group": "International, men's",
+   "name": "Copa América",
+   "value": 100,
+   "prestige": 5,
+   "pool": "men_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "copa america"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 47,
+   "group": "International, women's",
+   "name": "Women's World Cup (finals)",
+   "value": 98,
+   "prestige": 1,
+   "pool": "women_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "women s world cup",
+     "world cup women",
+     "fifa women"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 48,
+   "group": "International, women's",
+   "name": "Women's World Cup qualifiers",
+   "value": 80,
+   "prestige": 4,
+   "pool": "women_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "women.*world cup.*qualif",
+     "world cup women.*qualif"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 49,
+   "group": "International, women's",
+   "name": "Women's European Championship (finals)",
+   "value": 98,
+   "prestige": 2,
+   "pool": "women_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "women s euro",
+     "euro women",
+     "women s european championship"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 50,
+   "group": "International, women's",
+   "name": "Women's European Championship qualifiers",
+   "value": 80,
+   "prestige": 5,
+   "pool": "women_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "women.*euro.*qualif",
+     "euro.*women.*qualif"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 51,
+   "group": "International, women's",
+   "name": "Women's Nations League",
+   "value": 80,
+   "prestige": 3,
+   "pool": "women_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "nations league women",
+     "women s nations league"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 52,
+   "group": "International, women's",
+   "name": "Women's Copa América",
+   "value": 85,
+   "prestige": 2,
+   "pool": "women_nat",
+   "kind": "international",
+   "country": "World",
+   "openfoot_id": null,
+   "watch": {
+    "name_patterns": [
+     "copa america femenina",
+     "women s copa america",
+     "copa america women"
+    ],
+    "where": []
+   }
+  },
+  {
+   "no": 53,
+   "group": "More European leagues",
+   "name": "Czech First League",
+   "value": 60,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Czech Republic",
+   "strength": 64,
+   "openfoot_id": "comp_czech_first_league_cze"
+  },
+  {
+   "no": 54,
+   "group": "More European leagues",
+   "name": "Danish Superliga",
+   "value": 60,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Denmark",
+   "strength": 62,
+   "openfoot_id": "comp_superliga_dnk"
+  },
+  {
+   "no": 55,
+   "group": "More European leagues",
+   "name": "Eliteserien (Norway)",
+   "value": 60,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Norway",
+   "strength": 60,
+   "openfoot_id": "comp_eliteserien_nor"
+  },
+  {
+   "no": 56,
+   "group": "More European leagues",
+   "name": "Austrian Bundesliga",
+   "value": 60,
+   "prestige": 4,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Austria",
+   "strength": 62,
+   "openfoot_id": "comp_bundesliga_aut"
+  },
+  {
+   "no": 57,
+   "group": "More European leagues",
+   "name": "Swiss Super League",
+   "value": 60,
+   "prestige": 5,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Switzerland",
+   "strength": 61,
+   "openfoot_id": "comp_super_league_sui"
+  },
+  {
+   "no": 58,
+   "group": "More European leagues",
+   "name": "Ekstraklasa (Poland)",
+   "value": 55,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Poland",
+   "strength": 58,
+   "openfoot_id": "comp_ekstraklasa_pol"
+  },
+  {
+   "no": 59,
+   "group": "More European leagues",
+   "name": "Ligat ha'Al (Israel)",
+   "value": 50,
+   "prestige": 5,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Israel",
+   "strength": 55,
+   "openfoot_id": "comp_ligat_ha_al_isr"
+  },
+  {
+   "no": 60,
+   "group": "More European leagues",
+   "name": "HNL (Croatia)",
+   "value": 55,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Croatia",
+   "strength": 58,
+   "openfoot_id": "comp_hnl_cro"
+  },
+  {
+   "no": 61,
+   "group": "More European leagues",
+   "name": "Serbian SuperLiga",
+   "value": 50,
+   "prestige": 6,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Serbia",
+   "strength": 57,
+   "openfoot_id": "comp_superliga_srb"
+  },
+  {
+   "no": 62,
+   "group": "More European leagues",
+   "name": "Cypriot First Division",
+   "value": 50,
+   "prestige": 7,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Cyprus",
+   "strength": 55,
+   "openfoot_id": "comp_first_division_cyp"
+  },
+  {
+   "no": 63,
+   "group": "More European leagues",
+   "name": "Ukrainian Premier League",
+   "value": 50,
+   "prestige": 8,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Ukraine",
+   "strength": 57,
+   "openfoot_id": "comp_premier_league_ukr"
+  },
+  {
+   "no": 64,
+   "group": "Rest of the world",
+   "name": "Série A (Brazil)",
+   "value": 65,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Brazil",
+   "strength": 80,
+   "openfoot_id": "comp_brasileirao_bra"
+  },
+  {
+   "no": 65,
+   "group": "Rest of the world",
+   "name": "Liga Profesional (Argentina)",
+   "value": 65,
+   "prestige": 4,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Argentina",
+   "strength": 78,
+   "openfoot_id": "comp_liga_profesional_arg"
+  },
+  {
+   "no": 66,
+   "group": "Rest of the world",
+   "name": "Liga MX (Mexico)",
+   "value": 60,
+   "prestige": 6,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Mexico",
+   "strength": 70,
+   "openfoot_id": "comp_liga_mx_mex"
+  },
+  {
+   "no": 67,
+   "group": "Rest of the world",
+   "name": "Saudi Pro League",
+   "value": 55,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Saudi Arabia",
+   "strength": 66,
+   "openfoot_id": "comp_saudi_pro_league_sau"
+  },
+  {
+   "no": 68,
+   "group": "Rest of the world",
+   "name": "K League 1 (South Korea)",
+   "value": 55,
+   "prestige": 4,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "South Korea",
+   "strength": 62,
+   "openfoot_id": "comp_k_league_1_kor"
+  },
+  {
+   "no": 69,
+   "group": "Rest of the world",
+   "name": "Primera A (Colombia)",
+   "value": 50,
+   "prestige": 9,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Colombia",
+   "strength": 64,
+   "openfoot_id": "comp_primera_a_col"
+  },
+  {
+   "no": 70,
+   "group": "Rest of the world",
+   "name": "LigaPro (Ecuador)",
+   "value": 50,
+   "prestige": 10,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Ecuador",
+   "strength": 62,
+   "openfoot_id": "comp_ligapro_ecu"
+  },
+  {
+   "no": 71,
+   "group": "Rest of the world",
+   "name": "Primera División (Uruguay)",
+   "value": 50,
+   "prestige": 11,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Uruguay",
+   "strength": 64,
+   "openfoot_id": "comp_primera_division_uru"
+  },
+  {
+   "no": 72,
+   "group": "Rest of the world",
+   "name": "Primera División (Chile)",
+   "value": 50,
+   "prestige": 12,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Chile",
+   "strength": 60,
+   "openfoot_id": "comp_primera_division_chi"
+  },
+  {
+   "no": 73,
+   "group": "Second tiers",
+   "name": "2. Bundesliga (Germany)",
+   "value": 55,
+   "prestige": 5,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Germany",
+   "strength": 70,
+   "openfoot_id": "comp_2_bundesliga_de"
+  },
+  {
+   "no": 74,
+   "group": "Second tiers",
+   "name": "Serie B (Italy)",
+   "value": 55,
+   "prestige": 6,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Italy",
+   "strength": 68,
+   "openfoot_id": "comp_serie_b_it"
+  },
+  {
+   "no": 75,
+   "group": "Second tiers",
+   "name": "Segunda División (Spain)",
+   "value": 55,
+   "prestige": 7,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Spain",
+   "strength": 70,
+   "openfoot_id": "comp_segunda_es"
+  },
+  {
+   "no": 76,
+   "group": "Second tiers",
+   "name": "Ligue 2 (France)",
+   "value": 50,
+   "prestige": 13,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "France",
+   "strength": 66,
+   "openfoot_id": "comp_ligue_2_fr"
+  },
+  {
+   "no": 77,
+   "group": "Second tiers",
+   "name": "Liga Portugal 2",
+   "value": 45,
+   "prestige": 1,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Portugal",
+   "strength": 58,
+   "openfoot_id": "comp_segunda_liga_pt"
+  },
+  {
+   "no": 78,
+   "group": "Second tiers",
+   "name": "Eerste Divisie (Netherlands)",
+   "value": 45,
+   "prestige": 2,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Netherlands",
+   "strength": 56,
+   "openfoot_id": "comp_eerste_divisie_nl"
+  },
+  {
+   "no": 79,
+   "group": "Domestic cups",
+   "name": "FA Cup",
+   "value": 75,
+   "prestige": 6,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "England",
+   "openfoot_id": "comp_fa_cup_eng"
+  },
+  {
+   "no": 80,
+   "group": "Domestic cups",
+   "name": "DFB Pokal",
+   "value": 65,
+   "prestige": 5,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "Germany",
+   "openfoot_id": "comp_dfb_pokal_de"
+  },
+  {
+   "no": 81,
+   "group": "Domestic cups",
+   "name": "Copa del Rey",
+   "value": 65,
+   "prestige": 6,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "Spain",
+   "openfoot_id": "comp_copa_del_rey_es"
+  },
+  {
+   "no": 82,
+   "group": "Domestic cups",
+   "name": "Coppa Italia",
+   "value": 65,
+   "prestige": 7,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "Italy",
+   "openfoot_id": "comp_coppa_italia_it"
+  },
+  {
+   "no": 83,
+   "group": "Domestic cups",
+   "name": "Coupe de France",
+   "value": 60,
+   "prestige": 7,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "France",
+   "openfoot_id": "comp_coupe_de_france_fr"
+  },
+  {
+   "no": 84,
+   "group": "Domestic cups",
+   "name": "Copa do Brasil",
+   "value": 55,
+   "prestige": 8,
+   "pool": "men_club",
+   "kind": "cup",
+   "country": "Brazil",
+   "openfoot_id": "comp_copa_do_brasil_bra"
+  },
+  {
+   "no": 85,
+   "group": "Close to home",
+   "name": "NIFL Premiership (Northern Ireland)",
+   "value": 50,
+   "prestige": 14,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Northern Ireland",
+   "strength": 36,
+   "openfoot_id": "comp_premiership_nir"
+  },
+  {
+   "no": 86,
+   "group": "Close to home",
+   "name": "Cymru Premier (Wales)",
+   "value": 45,
+   "prestige": 3,
+   "pool": "men_club",
+   "kind": "league",
+   "country": "Wales",
+   "strength": 34,
+   "openfoot_id": "comp_cymru_premier_wal"
+  }
+ ],
+ "other_league_strength": {
+  "_about": "Starting strength for leagues not on your list (e.g. the home league of a Danish club in the Europa League), by country. Second tiers get 'lower_division_penalty' less, third tiers twice that.",
+  "lower_division_penalty": 12,
+  "default": 40,
+  "countries": {
+   "England": 100,
+   "Spain": 92,
+   "Italy": 90,
+   "Germany": 89,
+   "France": 84,
+   "Portugal": 78,
+   "Netherlands": 76,
+   "Belgium": 72,
+   "Turkey": 70,
+   "Greece": 66,
+   "Czech Republic": 64,
+   "Denmark": 62,
+   "Austria": 62,
+   "Switzerland": 61,
+   "Norway": 60,
+   "Scotland": 62,
+   "Poland": 58,
+   "Croatia": 58,
+   "Serbia": 57,
+   "Ukraine": 57,
+   "Israel": 55,
+   "Cyprus": 55,
+   "Sweden": 58,
+   "Romania": 52,
+   "Hungary": 52,
+   "Slovakia": 50,
+   "Slovenia": 48,
+   "Bulgaria": 48,
+   "Azerbaijan": 48,
+   "Kazakhstan": 46,
+   "Russia": 60,
+   "Ireland": 44,
+   "Northern Ireland": 36,
+   "Wales": 34,
+   "Finland": 46,
+   "Iceland": 42,
+   "Bosnia": 44,
+   "Moldova": 38,
+   "Armenia": 40,
+   "Georgia": 42,
+   "Latvia": 40,
+   "Lithuania": 38,
+   "Estonia": 36,
+   "Albania": 42,
+   "Kosovo": 42,
+   "North Macedonia": 40,
+   "Montenegro": 40,
+   "Belarus": 44,
+   "Luxembourg": 36,
+   "Malta": 34,
+   "Faroe Islands": 34,
+   "Andorra": 28,
+   "Gibraltar": 28,
+   "San Marino": 22,
+   "Brazil": 80,
+   "Argentina": 78,
+   "Colombia": 64,
+   "Uruguay": 64,
+   "Ecuador": 62,
+   "Chile": 60,
+   "Paraguay": 60,
+   "Peru": 56,
+   "Bolivia": 50,
+   "Venezuela": 50,
+   "Mexico": 70,
+   "USA": 66,
+   "Canada": 56,
+   "Costa Rica": 50,
+   "Japan": 64,
+   "Saudi Arabia": 66,
+   "South Korea": 62,
+   "China": 54,
+   "Australia": 52,
+   "Qatar": 56,
+   "UAE": 56,
+   "Iran": 54,
+   "Egypt": 56,
+   "Morocco": 58,
+   "Tunisia": 54,
+   "Algeria": 54,
+   "South Africa": 54,
+   "Nigeria": 44,
+   "New Zealand": 40,
+   "Bosnia Herzegovina": 44,
+   "Bosnia and Herzegovina": 44,
+   "Turkiye": 70,
+   "Türkiye": 70,
+   "United States": 66,
+   "Korea Republic": 62,
+   "Uzbekistan": 46,
+   "Thailand": 44,
+   "Indonesia": 40,
+   "India": 38,
+   "Vietnam": 40,
+   "Iraq": 44,
+   "Liechtenstein": 25
+  }
+ },
+ "confederation_strength": {
+  "_about": "Starting strength for national teams by confederation (men's and women's pools are separate).",
+  "UEFA": 72,
+  "CONMEBOL": 74,
+  "CONCACAF": 52,
+  "CAF": 52,
+  "AFC": 48,
+  "OFC": 32,
+  "unknown": 50
+ },
+ "national_team_strength": {
+  "_about": "Starting strength (0-100) for men's national teams, roughly from world rankings in 2026. Results then move each team up or down every morning, so this is only where they begin. Edit freely; teams not listed use their confederation's strength.",
+  "teams": {
+   "Spain": 95,
+   "France": 94,
+   "England": 92,
+   "Portugal": 89,
+   "Netherlands": 87,
+   "Germany": 87,
+   "Italy": 84,
+   "Belgium": 83,
+   "Croatia": 82,
+   "Denmark": 78,
+   "Switzerland": 78,
+   "Austria": 77,
+   "Turkey": 76,
+   "Norway": 75,
+   "Ukraine": 74,
+   "Serbia": 73,
+   "Poland": 72,
+   "Czech Republic": 72,
+   "Hungary": 71,
+   "Sweden": 71,
+   "Greece": 71,
+   "Russia": 70,
+   "Scotland": 70,
+   "Wales": 68,
+   "Slovakia": 68,
+   "Romania": 67,
+   "Slovenia": 67,
+   "Ireland": 66,
+   "Georgia": 66,
+   "Albania": 65,
+   "Bosnia and Herzegovina": 63,
+   "Iceland": 62,
+   "Israel": 62,
+   "Finland": 61,
+   "North Macedonia": 60,
+   "Montenegro": 60,
+   "Northern Ireland": 60,
+   "Kosovo": 59,
+   "Bulgaria": 57,
+   "Belarus": 54,
+   "Armenia": 52,
+   "Kazakhstan": 52,
+   "Luxembourg": 50,
+   "Azerbaijan": 48,
+   "Cyprus": 47,
+   "Faroe Islands": 46,
+   "Estonia": 45,
+   "Latvia": 44,
+   "Lithuania": 44,
+   "Moldova": 40,
+   "Malta": 38,
+   "Andorra": 30,
+   "Gibraltar": 25,
+   "Liechtenstein": 22,
+   "San Marino": 12,
+   "Argentina": 95,
+   "Brazil": 91,
+   "Colombia": 85,
+   "Uruguay": 84,
+   "Ecuador": 82,
+   "Paraguay": 75,
+   "Venezuela": 68,
+   "Peru": 68,
+   "Chile": 68,
+   "Bolivia": 58,
+   "Morocco": 83,
+   "Japan": 82,
+   "Senegal": 78,
+   "Mexico": 77,
+   "USA": 76,
+   "South Korea": 76,
+   "Ivory Coast": 76,
+   "Iran": 75,
+   "Australia": 74,
+   "Canada": 72,
+   "Egypt": 72,
+   "Nigeria": 72,
+   "Algeria": 72,
+   "DR Congo": 70,
+   "Mali": 70,
+   "Cameroon": 70,
+   "Tunisia": 68,
+   "Ghana": 68,
+   "Panama": 68,
+   "South Africa": 66,
+   "Saudi Arabia": 66,
+   "Uzbekistan": 66,
+   "Burkina Faso": 66,
+   "Jordan": 64,
+   "Costa Rica": 64,
+   "Cape Verde": 64,
+   "Qatar": 62,
+   "Iraq": 62,
+   "Jamaica": 62,
+   "UAE": 60,
    "New Zealand": 58,
+   "Curacao": 55,
+   "Haiti": 52
+  },
+  "aliases": {
+   "Czechia": "Czech Republic",
+   "Türkiye": "Turkey",
+   "Turkiye": "Turkey",
+   "Republic of Ireland": "Ireland",
+   "Bosnia-Herzegovina": "Bosnia and Herzegovina",
+   "Bosnia & Herzegovina": "Bosnia and Herzegovina",
+   "United States": "USA",
+   "Korea Republic": "South Korea",
+   "Côte d'Ivoire": "Ivory Coast",
+   "Cote d'Ivoire": "Ivory Coast",
+   "United Arab Emirates": "UAE",
+   "Congo DR": "DR Congo",
+   "IR Iran": "Iran",
+   "Cabo Verde": "Cape Verde",
+   "Curaçao": "Curacao",
+   "FYR Macedonia": "North Macedonia",
+   "Faroe Is.": "Faroe Islands"
+  }
+ }
+}
    "Curacao": 55,
    "Haiti": 52
   },
