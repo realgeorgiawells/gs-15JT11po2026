@@ -3,8 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="robots" content="noindex,nofollow">
+<meta name="robots" content="noindex,nofollow,noarchive">
 <title>Goalscraper</title>
+<meta name="theme-color" content="#121417">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" href="icons/favicon-32.png">
 <link rel="apple-touch-icon" href="icons/icon-180.png">
@@ -12,162 +13,601 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Goalscraper">
-<meta name="theme-color" content="#0f1114">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#0f1114; --panel:#181b20; --panel2:#1d2026; --line:#262a31; --line2:#30353d;
+  --bg:#0d0f12; --plate1:#262a30; --plate2:#1b1e23; --plate3:#15181c; --edge:#363c44; --edge-hi:#4a515a;
   --text:#ece8df; --mute:#9aa0a8; --faint:#6c727a;
-  --gold:#c9a54a; --gold-hi:#e8cf86; --gold-lo:#7d5f22;
+  --gold:#c9a54a; --gold-hi:#ecd38a; --gold-lo:#7d5f22;
   --red:#e5484d; --amber:#e0a63a; --green:#4cc38a;
-  --engraved:"Cinzel",Georgia,serif; --gothic:"UnifrakturMaguntia",Georgia,serif;
-  --plain:system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
-  --bar:66px;
+  --engraved:"Cinzel","Trajan Pro",Georgia,serif;
+  --gothic:"UnifrakturMaguntia","Old English Text MT",Georgia,serif;
+  --plain:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  --tabbar:64px;
 }
-*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+*{box-sizing:border-box}
 html{color-scheme:dark}
-body{margin:0;min-height:100vh;background:var(--bg);color:var(--text);font:15px/1.4 var(--plain);
-  background-image:radial-gradient(ellipse at 50% -15%,rgba(201,165,74,.08),transparent 50%);
-  padding-bottom:calc(var(--bar) + env(safe-area-inset-bottom) + 18px)}
-.wrap{max-width:720px;margin:0 auto;padding:0 14px}
-button{font:inherit;color:inherit}
+body{
+  margin:0;min-height:100vh;color:var(--text);font:15px/1.45 var(--plain);
+  background:var(--bg);
+  background-image:
+    radial-gradient(ellipse at 50% -10%,rgba(201,165,74,.10),transparent 55%),
+    repeating-linear-gradient(90deg,rgba(255,255,255,.012) 0 1px,transparent 1px 3px),
+    linear-gradient(180deg,#14171b,#0d0f12 40%);
+  padding-bottom:calc(var(--tabbar) + env(safe-area-inset-bottom) + 16px);
+}
+.wrap{max-width:1400px;margin:0 auto;padding:0 16px}
 /* header */
-header{position:sticky;top:0;z-index:15;background:rgba(15,17,20,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
-  border-bottom:1px solid var(--line);padding-top:env(safe-area-inset-top)}
-.hd{display:flex;align-items:center;gap:10px;height:56px}
-.hd img{width:34px;height:34px}
-.hd h1{margin:0;font:400 28px/1 var(--gothic);flex:1;
-  background:linear-gradient(180deg,var(--gold-hi),var(--gold) 60%,var(--gold-lo));-webkit-background-clip:text;background-clip:text;color:transparent}
-.menu-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);display:grid;place-items:center;cursor:pointer}
-.menu-btn svg{width:20px;height:20px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
-.mock{font:600 10.5px/1 var(--plain);letter-spacing:.5px;color:#1b1610;background:var(--gold);border-radius:999px;padding:3px 7px;margin-right:4px}
-/* section head */
-.sh{padding:16px 2px 10px}
-.sh h2{margin:0;font:700 15px/1.2 var(--engraved);letter-spacing:3px;color:var(--gold);text-transform:uppercase}
-.sh p{margin:4px 0 0;color:var(--mute);font-size:13px}
-.sh .meta{margin-top:6px;font-size:12px;color:var(--faint)}
-/* list panel */
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.note{margin-top:10px;padding:10px 12px;border-radius:12px;border:1px solid rgba(224,166,58,.35);background:rgba(224,166,58,.07);
-  color:#ecd29a;font-size:13px}
-.note b{font-family:var(--engraved);letter-spacing:1px;font-size:11.5px}
-/* rows */
-.row{display:grid;grid-template-columns:54px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-top:1px solid var(--line);cursor:pointer}
-.row:first-child{border-top:0}
-.row:active{background:var(--panel2)}
-.sc{font:800 19px/1 var(--plain);font-variant-numeric:tabular-nums;text-align:center;letter-spacing:-.3px}
-.sc small{display:block;font:700 9px/1 var(--engraved);letter-spacing:1px;color:var(--faint);margin-top:4px}
-.mid{min-width:0}
-.teams{font:700 15.5px/1.25 var(--plain);overflow-wrap:anywhere}
-.teams .pk{color:var(--gold-hi)}
-.teams .v{color:var(--faint);font-weight:500;margin:0 3px}
-.sub{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:3px;font-size:12px;color:var(--faint)}
-.sub .tm{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums;font-size:13px}
-.sub .cp{font:700 10px/1.2 var(--engraved);letter-spacing:1px;color:var(--gold);text-transform:uppercase}
-.x{color:var(--red);font-weight:900}
-.kf{text-align:right}
-.kf b{display:block;font:800 17px/1 var(--plain);font-variant-numeric:tabular-nums}
-.kf i{display:block;font-style:normal;font-size:10.5px;color:var(--mute);margin-top:3px;white-space:nowrap}
-.chip{display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;font:600 10.5px/1.5 var(--plain);border:1px solid}
-.chip.amber{color:#f2c56b;border-color:rgba(224,166,58,.4);background:rgba(224,166,58,.1)}
-.chip.grey{color:var(--mute);border-color:var(--line2)}
-.chip.gold{color:var(--gold-hi);border-color:rgba(201,165,74,.45);background:rgba(201,165,74,.08)}
-/* details (under the hood) */
-.det{display:none;padding:2px 12px 14px 76px;border-top:0;background:linear-gradient(180deg,transparent,rgba(255,255,255,.015))}
-.det.open{display:block}
-.wdl{display:flex;height:8px;border-radius:5px;overflow:hidden;margin:6px 0 4px;background:var(--line)}
-.wdl span:nth-child(1){background:var(--green)}.wdl span:nth-child(2){background:#6c727a}.wdl span:nth-child(3){background:#5b8def}
-.wdlk{display:flex;justify-content:space-between;font-size:11.5px;color:var(--mute);font-variant-numeric:tabular-nums}
-.tr{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:9px}
-.tr .n{font-weight:600;font-size:13.5px}
-.rt{display:flex;gap:9px;font-variant-numeric:tabular-nums}
-.rt span{min-width:28px;text-align:center;font:800 14px/1 var(--plain)}
-.rt i{display:block;font:700 7.5px/1 var(--engraved);font-style:normal;letter-spacing:1px;color:var(--faint);margin-top:3px}
-.dl{margin-top:10px;font-size:12.5px;color:#cfcac0;line-height:1.6}
-.dl b{font-variant-numeric:tabular-nums}
-.gh{padding:8px 12px;font:700 10px/1.2 var(--engraved);letter-spacing:1.6px;color:var(--faint);text-transform:uppercase;border-top:1px solid var(--line);background:rgba(255,255,255,.015)}
-.gh:first-child{border-top:0}
-.dim .row .teams,.dim .row .kf b{opacity:.85}
-/* selected tab */
-.count{margin-top:14px;padding:14px;border-radius:14px;border:1px solid rgba(201,165,74,.35);
-  background:linear-gradient(180deg,rgba(201,165,74,.10),rgba(201,165,74,.03));text-align:center}
-.count .k{font:700 11px/1 var(--engraved);letter-spacing:3px;color:var(--gold)}
-.count .t{font:800 40px/1.1 var(--plain);font-variant-numeric:tabular-nums;letter-spacing:1px;margin-top:6px}
-.count .g{font-weight:700;font-size:15px;margin-top:4px}
-.count .m{font-size:12px;color:var(--mute);margin-top:2px}
-.srow{grid-template-columns:52px 1fr}
-.srow .ko{font:800 17px/1 var(--plain);font-variant-numeric:tabular-nums;text-align:center}
-.srow .ko small{display:block;font:600 10px/1.2 var(--plain);color:var(--faint);margin-top:4px}
-.labels{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}
-.fold{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:12px;padding:11px 14px;border-radius:12px;
-  border:1px solid var(--line);background:var(--panel);cursor:pointer;font:700 11.5px/1 var(--engraved);letter-spacing:2px;color:var(--mute)}
-.fold svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2;transition:transform .2s}
-.fold.open svg{transform:rotate(180deg)}
+header{padding:calc(14px + env(safe-area-inset-top)) 0 10px;text-align:center}
+.brand{display:flex;align-items:center;justify-content:center;gap:12px}
+.brand img{width:46px;height:46px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.6))}
+.brand h1{margin:0;font:400 40px/1 var(--gothic);letter-spacing:.5px;
+  background:linear-gradient(180deg,var(--gold-hi),var(--gold) 55%,var(--gold-lo));-webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 1px 0 rgba(0,0,0,.8))}
+.sub{font:700 11px/1.4 var(--engraved);letter-spacing:3px;color:var(--mute);margin-top:6px;text-transform:uppercase}
+.rule{height:1px;margin:12px auto 0;max-width:420px;background:linear-gradient(90deg,transparent,var(--gold-lo),var(--gold),var(--gold-lo),transparent)}
+.banner{margin:10px 0 0;padding:10px 12px;border-radius:10px;font-size:13.5px;text-align:left;border:1px solid}
+.banner.rehearsal{border-color:rgba(201,165,74,.5);background:rgba(201,165,74,.08);color:#e9d9a8}
+.banner.stale{border-color:rgba(229,72,77,.55);background:rgba(229,72,77,.10);color:#f3b9bb}
+.banner b{font-family:var(--engraved);letter-spacing:1.5px;font-size:12px}
+/* panels */
+.plate{
+  background:linear-gradient(180deg,var(--plate1),var(--plate2) 60%,var(--plate3));
+  border:1px solid var(--edge);border-top-color:var(--edge-hi);border-radius:14px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.05),inset 0 -1px 0 rgba(0,0,0,.4),0 6px 18px rgba(0,0,0,.45);
+}
+h2.section{font:700 13px/1 var(--engraved);letter-spacing:4px;color:var(--gold);text-transform:uppercase;
+  margin:18px 2px 10px;display:flex;align-items:center;gap:10px}
+h2.section::after{content:"";flex:1;height:1px;background:linear-gradient(90deg,var(--gold-lo),transparent)}
+.hint{color:var(--mute);font-size:13px;margin:0 2px 12px}
 /* controls */
 .controls{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px}
-.controls input{grid-column:1/-1}
-.controls input,.controls select{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--line2);background:#121418;color:var(--text);font:inherit;font-size:14px}
-.minis{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
-.mini{font:700 11px/1 var(--plain);padding:4px 6px;border-radius:6px;background:var(--panel2);border:1px solid var(--line);font-variant-numeric:tabular-nums}
-.mini i{font-style:normal;font-family:var(--engraved);font-size:9px;letter-spacing:.8px;color:var(--faint);margin-right:4px}
-/* record / coverage / how */
-.stats{display:grid;grid-template-columns:1fr 1fr;gap:8px}
-.stat{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px}
-.stat .k{font:700 10px/1.2 var(--engraved);letter-spacing:1.6px;color:var(--gold);text-transform:uppercase}
-.stat .v{font:800 24px/1.2 var(--plain);font-variant-numeric:tabular-nums;margin-top:4px}
-.stat .s{font-size:12px;color:var(--faint)}
-.kv{display:flex;justify-content:space-between;gap:12px;padding:10px 14px;border-top:1px solid var(--line);font-size:13.5px}
-.kv:first-child{border-top:0}.kv span:first-child{color:var(--mute)}
-.log{padding:10px 14px;border-top:1px solid var(--line);font-size:13px;color:#cfcac0}
-.log:first-child{border-top:0}.log small{display:block;color:var(--faint);font-size:11.5px}
-.prose{padding:4px 14px 14px;font-size:14px;color:#d6d1c6}
-.prose h3{font:700 12px/1.3 var(--engraved);letter-spacing:2px;color:var(--gold);margin:16px 0 4px;text-transform:uppercase}
-.back{display:inline-flex;align-items:center;gap:6px;margin-top:12px;background:none;border:0;color:var(--mute);cursor:pointer;font:700 11px/1 var(--engraved);letter-spacing:2px;padding:6px 0}
-.back svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:2}
-/* menu sheet */
-.scrim{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:30;display:none}
-.scrim.on{display:block}
-.sheet{position:fixed;top:calc(env(safe-area-inset-top) + 60px);right:14px;z-index:31;width:240px;display:none;
-  background:var(--panel2);border:1px solid var(--line2);border-radius:14px;box-shadow:0 18px 40px rgba(0,0,0,.6);overflow:hidden}
-.sheet.on{display:block}
-.sheet button{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;background:none;border:0;border-top:1px solid var(--line);
-  cursor:pointer;text-align:left;font-size:14.5px}
-.sheet button:first-child{border-top:0}
-.sheet svg{width:18px;height:18px;stroke:var(--gold);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-/* bottom bar */
-nav{position:fixed;left:0;right:0;bottom:0;z-index:20;padding-bottom:env(safe-area-inset-bottom);
-  background:#14161a;border-top:1px solid var(--line2)}
-nav .in{max-width:720px;margin:0 auto;display:grid;grid-template-columns:repeat(5,1fr);height:var(--bar)}
-nav button{background:none;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;
-  color:var(--faint);font:700 9.5px/1.1 var(--engraved);letter-spacing:.6px;text-transform:uppercase;text-align:center;position:relative;padding:0 2px}
-nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-nav button.on{color:var(--gold-hi)}
-nav button.on::before{content:"";position:absolute;top:0;left:25%;right:25%;height:2px;background:var(--gold);box-shadow:0 0 8px var(--gold)}
-.hidden{display:none!important}
-.banner{margin-top:12px;padding:10px 12px;border-radius:12px;font-size:13px;border:1px solid}
-.banner b{font-family:var(--engraved);letter-spacing:1px;font-size:11.5px}
-.banner.stale{border-color:rgba(229,72,77,.5);background:rgba(229,72,77,.08);color:#f3b9bb}
-.banner.new{border-color:rgba(76,195,138,.45);background:rgba(76,195,138,.07);color:#bfead3}
-.daystr{font-size:12px;color:var(--faint);padding:8px 2px 0}
-.res{font:700 11.5px/1.5 var(--plain);padding:1px 7px;border-radius:999px;border:1px solid;white-space:nowrap}
-.res.won{color:#7fdcaf;border-color:rgba(76,195,138,.4);background:rgba(76,195,138,.1)}
-.res.lost{color:#f3a0a3;border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.1)}
-.res.void,.res.pending{color:var(--mute);border-color:var(--line2)}
-.cov{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid var(--line)}
-.cov:first-child{border-top:0}
-.vb{font:800 12.5px/1 var(--plain);min-width:34px;text-align:center;padding:6px 0;border-radius:8px;background:var(--panel2);color:var(--gold-hi)}
-.cov .t{font-weight:600;font-size:14px}.cov .m{font-size:11.5px;color:var(--faint)}
+.controls input{grid-column:1 / -1}
+@media(min-width:640px){.controls{grid-template-columns:2fr 1.4fr 1fr}.controls input{grid-column:auto}}
+.controls input,.controls select{width:100%;padding:8px 10px;border-radius:10px;border:1px solid var(--edge);
+  background:#121418;color:var(--text);font:inherit;font-size:14px}
+.controls input:focus,.controls select:focus{outline:none;border-color:var(--gold)}
+/* game cards */
+.cards{display:grid;grid-template-columns:1fr;gap:12px}
+@media(min-width:760px){.cards{grid-template-columns:1fr 1fr}}
+.card{padding:14px 14px 12px;position:relative}
+.card.top::before{content:"";position:absolute;inset:0;border-radius:14px;pointer-events:none;
+  box-shadow:inset 0 0 0 1px rgba(201,165,74,.35)}
+.row1{display:flex;align-items:flex-start;gap:10px}
+.rank{flex:none;min-width:34px;height:34px;padding:0 6px;border-radius:9px;display:grid;place-items:center;
+  font:800 14px/1 var(--engraved);color:#1b1610;background:linear-gradient(180deg,var(--gold-hi),var(--gold) 60%,var(--gold-lo));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 1px 2px rgba(0,0,0,.6)}
+.rank.plain{background:#2b3037;color:var(--mute);box-shadow:none;font-size:12px}
+.when{flex:1;min-width:0}
+.ko{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font:700 22px/1.1 var(--plain);font-variant-numeric:tabular-nums;letter-spacing:.3px}
+.ko .x{color:var(--red);font:900 26px/1 var(--plain);text-shadow:0 0 10px rgba(229,72,77,.45)}
+.ko .ago{flex-basis:100%;font:600 12px/1.2 var(--plain);color:#f0a2a4;letter-spacing:0;margin-top:-2px}
+.comp{font:700 12px/1.3 var(--engraved);letter-spacing:1.6px;color:var(--gold);text-transform:uppercase;margin-top:5px}
+.comp span{color:var(--faint);font-family:var(--plain);letter-spacing:0;text-transform:none;font-weight:500}
+.scorebox{flex:none;text-align:right}
+.score{font:800 38px/1 var(--plain);font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.score-label{font:700 9.5px/1 var(--engraved);letter-spacing:2px;color:var(--mute);margin-top:3px}
+.teams{margin-top:12px;display:grid;gap:6px}
+.team{display:grid;grid-template-columns:1fr auto;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;
+  background:rgba(0,0,0,.22);border:1px solid rgba(255,255,255,.04)}
+.tname{font:700 18px/1.2 var(--plain);overflow-wrap:anywhere}
+.tname small{display:block;font:500 11.5px/1.2 var(--plain);color:var(--faint);margin-top:2px}
+.rates{display:flex;gap:10px;font-variant-numeric:tabular-nums}
+.rate{text-align:center;min-width:34px}
+.rate b{display:block;font:800 19px/1 var(--plain)}
+.rate i{display:block;font:700 9px/1 var(--engraved);font-style:normal;letter-spacing:1.4px;color:var(--mute);margin-top:4px}
+.stats{margin-top:10px;display:grid;grid-template-columns:repeat(2,1fr);gap:8px 12px;font-size:13.5px}
+@media(min-width:420px){.stats{grid-template-columns:repeat(4,1fr)}}
+.stat .k{font:700 9.5px/1.2 var(--engraved);letter-spacing:1.5px;color:var(--mute);text-transform:uppercase}
+.stat .v{font:600 15px/1.3 var(--plain);font-variant-numeric:tabular-nums}
+.stat .s{font-size:11.5px;color:var(--faint)}
+.foot{margin-top:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;font:600 11.5px/1.5 var(--plain);border:1px solid}
+.chip.amber{color:#f2c56b;border-color:rgba(224,166,58,.45);background:rgba(224,166,58,.12)}
+.chip.grey{color:var(--mute);border-color:var(--edge);background:rgba(255,255,255,.03)}
 .chip.green{color:#7fdcaf;border-color:rgba(76,195,138,.4);background:rgba(76,195,138,.1)}
-.chip.red{color:#f3a0a3;border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.1)}
-.subtabs{display:flex;gap:6px;margin:10px 0}
-.subtabs button{flex:1;padding:8px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);color:var(--mute);
-  font:700 10.5px/1 var(--engraved);letter-spacing:1.4px;cursor:pointer}
-.subtabs button.on{color:#1b1610;background:var(--gold);border-color:var(--gold)}
+.chip.red{color:#f3a0a3;border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.12)}
+.track{margin-left:auto;display:inline-flex;align-items:center;gap:7px;cursor:pointer;user-select:none;
+  font:700 11px/1 var(--engraved);letter-spacing:1.5px;color:var(--mute);padding:6px 4px}
+.track input{appearance:none;-webkit-appearance:none;width:22px;height:22px;margin:0;border-radius:6px;border:1.5px solid var(--gold-lo);
+  background:#121418;display:grid;place-items:center;cursor:pointer}
+.track input:checked{background:linear-gradient(180deg,var(--gold-hi),var(--gold));border-color:var(--gold)}
+.track input:checked::after{content:"✓";color:#1b1610;font:900 14px/1 var(--plain)}
+.track input:checked + span{color:var(--gold)}
+.result{font:700 13px/1 var(--plain);padding:4px 9px;border-radius:7px}
 .empty{padding:28px 16px;text-align:center;color:var(--mute)}
-.empty b{display:block;font:700 13px/1.4 var(--engraved);letter-spacing:2px;color:var(--gold);margin-bottom:6px}
+.empty b{display:block;font:700 14px/1.4 var(--engraved);letter-spacing:2px;color:var(--gold);margin-bottom:6px}
+/* table (wide screens) */
+.tablewrap{overflow-x:auto;padding:4px}
+table.games{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+table.games th{font:700 10.5px/1.2 var(--engraved);letter-spacing:1.5px;color:var(--gold);text-align:left;padding:10px 8px;
+  border-bottom:1px solid var(--gold-lo);white-space:nowrap;position:sticky;top:0;background:var(--plate2)}
+table.games td{padding:9px 7px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle}
+table.games tr:last-child td{border-bottom:0}
+table.games tr.top td:first-child{box-shadow:inset 3px 0 0 var(--gold)}
+.t-ko{font:700 17px/1 var(--plain);white-space:nowrap}
+.t-ko .x{color:var(--red);font-weight:900;font-size:19px;margin-left:5px}
+.t-ko small{display:block;font:500 11px/1.2 var(--plain);color:#f0a2a4;margin-top:3px}
+.t-comp{font:700 11px/1.3 var(--engraved);letter-spacing:1px;color:var(--gold);text-transform:uppercase;max-width:150px}
+.t-team{font:700 15px/1.25 var(--plain);min-width:120px}
+table.games .chip{white-space:nowrap;font-size:11px;padding:2px 7px;margin:1px 0}
+.t-tags{min-width:84px}
+.t-r{font:800 15px/1 var(--plain);text-align:center;min-width:30px}
+.t-score{font:800 24px/1 var(--plain);text-align:right}
+.num{text-align:right;white-space:nowrap}
+/* record + coverage */
+.statgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding:14px}
+@media(min-width:640px){.statgrid{grid-template-columns:repeat(4,1fr)}}
+.big .k{font:700 10px/1.2 var(--engraved);letter-spacing:1.8px;color:var(--mute);text-transform:uppercase}
+.big .v{font:800 26px/1.15 var(--plain);font-variant-numeric:tabular-nums}
+.big .s{font-size:12px;color:var(--faint)}
+.list{padding:4px 0}
+.li{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:10px 14px;border-top:1px solid rgba(255,255,255,.05)}
+.li:first-child{border-top:0}
+.li .main{min-width:0}
+.li .t{font-weight:700;font-size:15px;overflow-wrap:anywhere}
+.li .m{font-size:12px;color:var(--faint)}
+.dayhead{padding:10px 14px 6px;font:700 11.5px/1 var(--engraved);letter-spacing:2px;color:var(--gold);border-top:1px solid var(--edge);text-transform:uppercase}
+.dayhead:first-child{border-top:0}
+.subtabs{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.subtabs button{flex:1;min-width:120px;padding:10px;border-radius:10px;border:1px solid var(--edge);background:#15181c;color:var(--mute);
+  font:700 11.5px/1 var(--engraved);letter-spacing:1.5px;cursor:pointer}
+.subtabs button.on{color:#1b1610;background:linear-gradient(180deg,var(--gold-hi),var(--gold));border-color:var(--gold)}
+.covsum{padding:14px;display:grid;gap:6px;font-size:14px}
+.covsum div{display:flex;justify-content:space-between;gap:10px;border-bottom:1px dashed rgba(255,255,255,.06);padding-bottom:6px}
+.covsum div:last-child{border-bottom:0}
+.covsum span:first-child{color:var(--mute)}
+.covsum b{font-variant-numeric:tabular-nums}
+.vbadge{font:800 13px/1 var(--plain);min-width:38px;text-align:center;padding:6px 0;border-radius:8px;background:#2a2f36;color:var(--gold-hi);font-variant-numeric:tabular-nums}
+details.about{margin-top:16px;padding:12px 14px}
+details.about summary{cursor:pointer;font:700 12px/1.3 var(--engraved);letter-spacing:2px;color:var(--gold);text-transform:uppercase}
+details.about p,details.about li{color:#cfcac0;font-size:13.5px}
+details.about ul{padding-left:18px;margin:6px 0}
+
+/* compact top-10 card */
+.cc{padding:10px 12px 9px}
+.cc .r1{display:flex;align-items:center;gap:9px}
+.cc .rank{min-width:28px;height:28px;font-size:12.5px;border-radius:8px}
+.cc .when{flex:1;min-width:0;display:flex;flex-direction:column}
+.cc .t1{display:flex;align-items:baseline;gap:7px;flex-wrap:wrap}
+.cc .tm{font:700 17px/1.1 var(--plain);font-variant-numeric:tabular-nums}
+.cc .x{color:var(--red);font:900 18px/1 var(--plain);text-shadow:0 0 8px rgba(229,72,77,.45)}
+.cc .ag{font:600 11px/1.2 var(--plain);color:#f0a2a4}
+.cc .cp{font:700 10.5px/1.3 var(--engraved);letter-spacing:1.3px;color:var(--gold);text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cc .sc{font:800 27px/1 var(--plain);font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.cc .tl{display:grid;grid-template-columns:1fr auto;align-items:center;gap:8px;margin-top:7px}
+.cc .tn{font:700 15.5px/1.2 var(--plain);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cc .rt{display:flex;gap:9px;font-variant-numeric:tabular-nums}
+.cc .rt span{min-width:30px;text-align:center;font:800 15px/1 var(--plain)}
+.cc .rt i{display:block;font:700 8px/1 var(--engraved);font-style:normal;letter-spacing:1.2px;color:var(--mute);margin-top:3px}
+.cc .ft{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:7px;border-top:1px solid rgba(255,255,255,.06);font-size:12.5px;color:#cfcac0}
+.cc .ft b{font-variant-numeric:tabular-nums}
+.cc .track{padding:2px 0 2px 4px}
+.cc .track input{width:20px;height:20px}
+.cards.compact{gap:8px}
+/* slim all-games rows */
+.rows{padding:2px 0}
+.gr{display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;padding:9px 12px;border-top:1px solid rgba(255,255,255,.05);cursor:pointer}
+.gr:first-child{border-top:0}
+.gr .vbadge{min-width:52px;font-size:14px;padding:7px 0}
+.gr .t{font:700 14.5px/1.25 var(--plain);overflow-wrap:anywhere}
+.gr .m{font-size:12px;color:var(--faint);margin-top:2px}
+.gr .m .tm{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
+.gr .m .x{color:var(--red);font-weight:900;margin-left:2px}
+.gr .m .cpn{font:700 10px/1 var(--engraved);letter-spacing:1px;color:var(--gold);text-transform:uppercase}
+.gr .track{padding:4px 0}
+.grx{padding:2px 12px 12px 74px;font-size:12.5px;color:#cfcac0;border-top:0}
+.grx .tl{display:grid;grid-template-columns:1fr auto;gap:8px;align-items:center;margin-top:5px}
+.grx .rt{display:flex;gap:8px;font-variant-numeric:tabular-nums}
+.grx .rt span{min-width:28px;text-align:center;font:800 13.5px/1 var(--plain)}
+.grx .rt i{display:block;font:700 7.5px/1 var(--engraved);font-style:normal;letter-spacing:1px;color:var(--mute);margin-top:3px}
+.grx .ln{margin-top:7px}
+.banner.new{border-color:rgba(76,195,138,.5);background:rgba(76,195,138,.08);color:#bfead3}
+/* bottom tab bar */
+nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;padding-bottom:env(safe-area-inset-bottom);
+  background:linear-gradient(180deg,#23272d,#15181c);border-top:1px solid var(--gold-lo);
+  box-shadow:0 -8px 22px rgba(0,0,0,.55)}
+nav.tabs .in{max-width:640px;margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);height:var(--tabbar)}
+nav.tabs button{background:none;border:0;color:var(--mute);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;
+  font:700 10px/1 var(--engraved);letter-spacing:1.2px;cursor:pointer;position:relative;text-transform:uppercase}
+nav.tabs button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+nav.tabs button.on{color:var(--gold-hi)}
+nav.tabs button.on::before{content:"";position:absolute;top:0;left:22%;right:22%;height:2px;background:var(--gold);box-shadow:0 0 10px var(--gold)}
+.hidden{display:none!important}
 </style>
+</head>
+<body>
+<header class="wrap">
+  <div class="brand"><img src="logo.svg" alt=""><h1>Goalscraper</h1></div>
+  <div class="sub" id="sub">Loading…</div>
+  <div class="rule"></div>
+  <div id="banners"></div>
+</header>
+
+<main class="wrap">
+  <section id="tab-top"></section>
+  <section id="tab-all" class="hidden">
+    <h2 class="section">All games</h2>
+    <p class="hint">Tap a game for team ratings and details.</p>
+    <div class="controls">
+      <input id="q" type="search" placeholder="Search team or competition" autocomplete="off">
+      <select id="fcomp"><option value="">All competitions</option></select>
+      <select id="sort">
+        <option value="score">Sort: score</option>
+        <option value="ko">Sort: kickoff</option>
+        <option value="odds">Sort: odds</option>
+      </select>
+    </div>
+    <div id="allList"></div>
+  </section>
+  <section id="tab-record" class="hidden"></section>
+  <section id="tab-coverage" class="hidden"></section>
+</main>
+
+<nav class="tabs" aria-label="Sections"><div class="in">
+  <button data-tab="top" class="on"><svg viewBox="0 0 24 24"><path d="M12 3l7 3v5c0 4.5-3 8.2-7 10-4-1.8-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg>Top 10</button>
+  <button data-tab="all"><svg viewBox="0 0 24 24"><path d="M8 6h12M8 12h12M8 18h12"/><circle cx="4" cy="6" r="1"/><circle cx="4" cy="12" r="1"/><circle cx="4" cy="18" r="1"/></svg>All games</button>
+  <button data-tab="record"><svg viewBox="0 0 24 24"><path d="M6 3h9l3 3v15H6z"/><path d="M9 10h6M9 14h6M9 18h4"/></svg>Record</button>
+  <button data-tab="coverage"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/></svg>Coverage</button>
+</div></nav>
+
+<script>
+(function(){
+"use strict";
+const TZ = "Europe/Dublin";
+let D = null, COV = null, HIST = null;
+
+/* ---------- small helpers ---------- */
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const pct = (x, d=1) => x == null ? "–" : (x*100).toFixed(d) + "%";
+const store = {
+  get(k, def){ try{ const v = localStorage.getItem(k); return v ? JSON.parse(v) : def; }catch(e){ return def; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+};
+function hue(v){ // 0..100 -> red .. amber .. green
+  const t = Math.max(0, Math.min(1, (v - 1) / 99));
+  return `hsl(${Math.round(t * 128)} ${68 + t*4}% ${52 + Math.sin(t*Math.PI)*6}%)`;
+}
+const fmtTime = ts => new Intl.DateTimeFormat("en-IE",{timeZone:TZ,hour:"2-digit",minute:"2-digit",hour12:false}).format(new Date(ts*1000));
+const fmtDay = (ts, opts) => new Intl.DateTimeFormat("en-IE",Object.assign({timeZone:TZ,weekday:"short",day:"numeric",month:"short"},opts||{})).format(new Date(ts*1000));
+function nowTs(){
+  // In rehearsal the clock runs from the rehearsal morning, so "kicked off" marks still make sense.
+  const real = Date.now()/1000;
+  if (D && D.mode === "rehearsal"){
+    const gen = Date.parse(D.generated_utc)/1000;
+    return D.window_start_ts + Math.max(0, real - gen);
+  }
+  return real;
+}
+function ago(sec){
+  const m = Math.floor(sec/60);
+  if (m < 60) return `kicked off ${m} min ago`;
+  const h = Math.floor(m/60), r = m % 60;
+  return `kicked off ${h} h ${r} min ago`;
+}
+const tracked = () => store.get("gs_tracked", {});
+
+/* ---------- loading ---------- */
+async function getJSON(name){
+  try{ const r = await fetch(`data/${name}?v=${Date.now()}`, {cache:"no-store"}); if (r.ok) return await r.json(); }catch(e){}
+  return (window.__GS__ || {})[name.replace(".json","")] || null;
+}
+
+/* ---------- header ---------- */
+function header(){
+  const sub = $("#sub");
+  if (!D){ sub.textContent = "No data yet"; return; }
+  const start = D.window_start_ts;
+  sub.textContent = `${fmtDay(start,{weekday:"long",month:"long"})} · ${D.games.length} games · next ${Math.round((D.window_end_ts-start)/3600)} hours`;
+  const b = [];
+  if (D.mode === "rehearsal"){
+    b.push(`<div class="banner rehearsal"><b>REHEARSAL</b> &nbsp;Real games from ${esc(fmtDay(start,{weekday:"long",month:"long",year:"numeric"}))}, run as if it were that morning. No odds in rehearsal. Switch to live when you have the Pro plan.</div>`);
+  } else {
+    const age = Date.now() - Date.parse(D.generated_utc);
+    if (age > 26*3600*1000){
+      b.push(`<div class="banner stale"><b>OUT OF DATE</b> &nbsp;This list was made ${esc(new Date(D.generated_utc).toLocaleString("en-IE",{timeZone:TZ,dateStyle:"medium",timeStyle:"short"}))}. This morning's update may have failed — check the Coverage tab.</div>`);
+    }
+  }
+  if (D.new_competitions && D.new_competitions.length){
+    b.push(`<div class="banner new"><b>NEW ON OPENFOOTAPI</b> &nbsp;${D.new_competitions.map(esc).join(", ")} ${D.new_competitions.length === 1 ? "is" : "are"} now available and included automatically. See the Coverage tab.</div>`);
+  }
+  if (COV && COV.last_error){
+    b.push(`<div class="banner stale"><b>UPDATE PROBLEM</b> &nbsp;${esc(COV.last_error)}</div>`);
+  }
+  $("#banners").innerHTML = b.join("");
+}
+
+/* ---------- game rendering ---------- */
+function chips(g, short){
+  const out = [];
+  for (const t of g.tags || []){
+    if (t === "below_min_odds") out.push(`<span class="chip amber">${short ? "Low odds" : `Below min odds (${D.min_odds.toFixed(2)})`}</span>`);
+    else if (t === "no_odds") { if (D.odds_enabled !== false) out.push(`<span class="chip amber">No odds</span>`); }
+    else if (t === "time_tbc") out.push(`<span class="chip grey">Time TBC</span>`);
+    else if (t === "limited_data") out.push(`<span class="chip amber">${short ? "Limited" : "Limited data"}</span>`);
+  }
+  if (g.final){
+    if (g.final.h == null) out.push(`<span class="chip grey">${esc(g.final.status)}</span>`);
+    else {
+      const nil = g.final.h === 0 && g.final.a === 0;
+      out.push(`<span class="chip ${nil ? "red" : "green"}">${short ? "" : "Result "}${g.final.h}–${g.final.a}${nil ? " ✕" : " ✓"}</span>`);
+    }
+  }
+  return out.join("");
+}
+function koHTML(g, table){
+  const now = nowTs(), started = now >= g.ts;
+  const t = esc(fmtTime(g.ts));
+  if (table) return `<div class="t-ko">${t}${started ? `<span class="x" title="Kicked off">✕</span><small>${ago(now-g.ts)}</small>` : ""}</div>`;
+  return `<div class="ko">${t}${started ? `<span class="x" aria-label="Kicked off">✕</span><span class="ago">${ago(now-g.ts)}</span>` : ""}</div>`;
+}
+function rate(v, label){ return `<div class="rate"><b style="color:${hue(v)}">${Math.round(v)}</b><i>${label}</i></div>`; }
+function teamRow(t){
+  return `<div class="team"><div class="tname">${esc(t.name)}<small>${t.games} game${t.games===1?"":"s"} of data</small></div>
+    <div class="rates">${rate(t.ovr,"OVR")}${rate(t.att,"ATT")}${rate(t.def,"DEF")}</div></div>`;
+}
+function trackBox(g){
+  const on = !!tracked()[g.fid];
+  return `<label class="track"><input type="checkbox" data-fid="${g.fid}" ${on?"checked":""}><span>TRACK</span></label>`;
+}
+function koParts(g){
+  const now = nowTs(), started = now >= g.ts;
+  return {t: esc(fmtTime(g.ts)), started, ago: started ? ago(now - g.ts) : ""};
+}
+function rates(t){
+  return `<div class="rt"><span style="color:${hue(t.ovr)}">${Math.round(t.ovr)}<i>OVR</i></span><span style="color:${hue(t.att)}">${Math.round(t.att)}<i>ATT</i></span><span style="color:${hue(t.def)}">${Math.round(t.def)}<i>DEF</i></span></div>`;
+}
+function footLine(g){
+  const odds = D.odds_enabled === false ? "" :
+    ` · O0.5 <b>${g.odds ? g.odds.toFixed(2) : "–"}</b>${g.edge == null ? "" : ` · edge <b>${(g.edge>=0?"+":"") + g.edge.toFixed(1)}</b>`}`;
+  return `P(0-0) <b>${pct(g.p00)}</b> · xG <b>${g.xg_home.toFixed(1)}–${g.xg_away.toFixed(1)}</b>${odds}`;
+}
+function card(g){
+  const k = koParts(g);
+  return `<article class="card plate cc ${g.top10?"top":""}">
+    <div class="r1"><div class="rank">${g.rank}</div>
+      <div class="when"><div class="t1"><span class="tm">${k.t}</span>${k.started ? `<span class="x" aria-label="Kicked off">✕</span><span class="ag">${k.ago}</span>` : ""}</div>
+        <div class="cp">${esc(g.comp)}</div></div>
+      <div class="sc" style="color:${hue(g.score)}">${g.score.toFixed(2)}</div></div>
+    <div class="tl"><div class="tn">${esc(g.home.name)}</div>${rates(g.home)}</div>
+    <div class="tl"><div class="tn">${esc(g.away.name)}</div>${rates(g.away)}</div>
+    <div class="ft"><span>${footLine(g)}</span>${chips(g)}${trackBox(g)}</div>
+  </article>`;
+}
+function slimRow(g){
+  const k = koParts(g);
+  return `<div class="gr" data-row="${esc(g.fid)}"><div class="vbadge" style="color:${hue(g.score)}">${g.score.toFixed(2)}</div>
+    <div class="main"><div class="t">${esc(g.home.name)} v ${esc(g.away.name)}</div>
+      <div class="m"><span class="tm">${k.t}</span>${k.started ? `<span class="x">✕</span>` : ""} · <span class="cpn">${esc(g.comp)}</span> · #${g.rank}${(g.tags||[]).includes("limited_data") ? " · limited data" : ""}</div></div>
+    ${trackBox(g).replace("<span>TRACK</span>", "")}</div>
+    <div class="grx hidden" data-detail="${esc(g.fid)}">
+      ${k.started ? `<div style="color:#f0a2a4">${k.ago}</div>` : ""}
+      <div class="tl"><div>${esc(g.home.name)}</div>${rates(g.home)}</div>
+      <div class="tl"><div>${esc(g.away.name)}</div>${rates(g.away)}</div>
+      <div class="ln">${footLine(g)}${g.round ? ` · ${esc(g.round)}` : ""}</div>
+      <div class="ln">${chips(g)}</div>
+    </div>`;
+}
+function tableHTML(list){
+  const rows = list.map(g => `<tr class="${g.top10?"top":""}">
+    <td class="num" style="color:var(--mute)">${g.rank}</td>
+    <td>${koHTML(g, true)}</td>
+    <td class="t-comp">${esc(g.comp)}</td>
+    <td class="t-team">${esc(g.home.name)}</td>
+    <td class="t-r" style="color:${hue(g.home.ovr)}">${Math.round(g.home.ovr)}</td><td class="t-r" style="color:${hue(g.home.att)}">${Math.round(g.home.att)}</td><td class="t-r" style="color:${hue(g.home.def)}">${Math.round(g.home.def)}</td>
+    <td class="t-team">${esc(g.away.name)}</td>
+    <td class="t-r" style="color:${hue(g.away.ovr)}">${Math.round(g.away.ovr)}</td><td class="t-r" style="color:${hue(g.away.att)}">${Math.round(g.away.att)}</td><td class="t-r" style="color:${hue(g.away.def)}">${Math.round(g.away.def)}</td>
+    <td class="t-score" style="color:${hue(g.score)}">${g.score.toFixed(2)}</td>
+    <td class="num">${pct(g.p00)}</td>
+    <td class="num">${g.xg_home.toFixed(1)}–${g.xg_away.toFixed(1)}</td>
+    ${D.odds_enabled === false ? "" : `<td class="num">${g.odds ? g.odds.toFixed(2) : "–"}</td>
+    <td class="num">${g.edge == null ? "–" : (g.edge>=0?"+":"") + g.edge.toFixed(1)}</td>`}
+    <td class="t-tags">${chips(g, true).replace(/<\/span><span/g, "</span><br><span")}</td>
+    <td>${trackBox(g).replace("<span>TRACK</span>", "")}</td></tr>`).join("");
+  return `<div class="plate tablewrap"><table class="games"><thead><tr>
+    <th>#</th><th>Kickoff</th><th>Competition</th><th>Home</th><th>OVR</th><th>ATT</th><th>DEF</th>
+    <th>Away</th><th>OVR</th><th>ATT</th><th>DEF</th><th class="num">Score</th><th class="num">P(0-0)</th>
+    <th class="num">xG</th>${D.odds_enabled === false ? "" : `<th class="num">O0.5</th><th class="num">Edge</th>`}<th>Tags</th><th>Track</th></tr></thead>
+    <tbody>${rows}</tbody></table></div>`;
+}
+const wide = () => window.matchMedia("(min-width: 1000px)").matches;
+
+/* ---------- tabs ---------- */
+function renderTop(){
+  const el = $("#tab-top");
+  if (!D){ el.innerHTML = `<div class="plate empty"><b>No data yet</b>The first morning run hasn't happened. Run it from GitHub (see the setup guide).</div>`; return; }
+  const top = D.games.filter(g => g.top10);
+  let html = `<h2 class="section">Top ${D.top_n}</h2>`;
+  if (!top.length) html += `<div class="plate empty"><b>No games</b>Nothing in your competitions in the next 24 hours.</div>`;
+  else html += wide() ? tableHTML(top) : `<div class="cards compact">${top.map(g => card(g)).join("")}</div>`;
+  html += about();
+  el.innerHTML = html;
+}
+function about(){
+  const w = D.weights || {};
+  return `<details class="about plate"><summary>How the score works</summary>
+    <p>Each game gets a score from 1.00 to 100.00. Higher means a 0-0 is less likely. 100 means P(0-0) of 1% or less; 1 means 30% or more.</p>
+    <ul>
+      <li><b>Team strength</b> comes from every result this season (and last season if there are few games), adjusted for how strong each opponent was, and for how strong each team's league is.</li>
+      <li><b>Recent form</b> is a small tweak (${Math.round((w.form||0)*100)}%) on top of long-term strength.</li>
+      ${D.odds_enabled === false ? `<li>Data comes from OpenFootAPI's free plan, which has no bookmaker odds, so scores come from results alone.</li>` : `<li><b>Bookmaker match odds</b> pull the expected goals ${Math.round((w.market||0)*100)}% of the way towards the market's view, when odds are listed.</li>`}
+      <li>Teams with little data are tagged <i>Limited data</i> and their score is trimmed slightly.</li>
+    </ul>
+    <p><b>A reality check:</b> if you bet at odds of ${D.min_odds.toFixed(2)}, you need to win about ${(100/D.min_odds).toFixed(0)} bets in every 100 just to break even, and one 0-0 wipes out roughly ${Math.round(1/(D.min_odds-1))} wins. Scores are a ranking, not a guarantee — the Record tab shows how they actually do.</p>
+  </details>`;
+}
+function renderAll(){
+  const el = $("#allList");
+  if (!D){ el.innerHTML = ""; return; }
+  const q = $("#q").value.trim().toLowerCase(), comp = $("#fcomp").value, sort = $("#sort").value;
+  let list = D.games.filter(g => (!comp || g.comp === comp) &&
+    (!q || (g.home.name + " " + g.away.name + " " + g.comp + " " + (g.league_name||"")).toLowerCase().includes(q)));
+  if (sort === "ko") list.sort((a,b) => a.ts - b.ts || b.score - a.score);
+  else if (sort === "odds") list.sort((a,b) => (b.odds||0) - (a.odds||0) || b.score - a.score);
+  else list.sort((a,b) => b.score - a.score);
+  if (!list.length){ el.innerHTML = `<div class="plate empty"><b>No matches</b>Try a different search or competition.</div>`; return; }
+  el.innerHTML = wide() ? tableHTML(list) : `<div class="plate rows">${list.map(slimRow).join("")}</div>`;
+}
+function settle(r){
+  if (!r) return {cls:"grey", txt:"Pending", st:"pending"};
+  if (r.void || r.h == null) return {cls:"grey", txt:"Void", st:"void"};
+  if (r.h === 0 && r.a === 0) return {cls:"red", txt:"0–0 ✕", st:"lost"};
+  return {cls:"green", txt:`${r.h}–${r.a} ✓`, st:"won"};
+}
+function summary(games){
+  let won=0, lost=0, voids=0, pend=0, pl=0, plN=0;
+  for (const g of games){
+    const s = settle(g.result).st;
+    if (s==="won"){ won++; if (g.odds){ pl += g.odds - 1; plN++; } }
+    else if (s==="lost"){ lost++; if (g.odds){ pl -= 1; plN++; } }
+    else if (s==="void") voids++; else pend++;
+  }
+  const n = won + lost;
+  return {won, lost, voids, pend, n, rate: n ? won/n : null, pl, plN};
+}
+let recordView = "top";
+function renderRecord(){
+  const el = $("#tab-record");
+  const hist = HIST && HIST.games ? Object.entries(HIST.games).map(([fid,g]) => Object.assign({fid}, g)) : [];
+  const mine = tracked();
+  const set = recordView === "top" ? hist.filter(g => g.top10) : hist.filter(g => mine[g.fid]);
+  const s = summary(set);
+  const rehearsal = HIST && HIST.mode === "rehearsal";
+  let html = `<h2 class="section">${rehearsal ? "Rehearsal record" : "Record"}</h2>
+    <div class="subtabs"><button data-rv="top" class="${recordView==="top"?"on":""}">Top 10 each day</button>
+    <button data-rv="mine" class="${recordView==="mine"?"on":""}">My ticked games (${Object.keys(mine).length})</button></div>`;
+  if (rehearsal) html += `<p class="hint">These are past dates run in rehearsal mode, so you can see how the scores would have done. They're cleared when you switch to live.</p>`;
+  html += `<div class="plate statgrid">
+    <div class="big"><div class="k">Avoided 0-0</div><div class="v" style="color:${s.rate==null?"var(--text)":hue(s.rate>=0.97?100:s.rate*60)}">${s.rate==null?"–":(s.rate*100).toFixed(1)+"%"}</div><div class="s">${s.won} of ${s.n} settled</div></div>
+    <div class="big"><div class="k">Ended 0-0</div><div class="v">${s.lost}</div><div class="s">losing picks</div></div>
+    <div class="big"><div class="k">Pending / void</div><div class="v">${s.pend} / ${s.voids}</div><div class="s">not counted</div></div>
+    ${D && D.odds_enabled === false ? `<div class="big"><div class="k">Tracked</div><div class="v">${set.length}</div><div class="s">games in this list</div></div>` : `<div class="big"><div class="k">Profit at best odds</div><div class="v" style="color:${s.pl>=0?"var(--green)":"var(--red)"}">${s.plN ? (s.pl>=0?"+":"") + s.pl.toFixed(2) : "–"}</div><div class="s">${s.plN ? `units, 1 per bet, ${s.plN} bets` : "needs games with odds"}</div></div>`}
+  </div>`;
+  if (!set.length){
+    html += `<div class="plate empty" style="margin-top:12px"><b>Nothing yet</b>${recordView==="top" ? "The top 10 are recorded automatically each morning and settled the next morning." : "Tick <i>Track</i> on any game to follow it here. Ticks are saved on this device only."}</div>`;
+  } else {
+    const days = {};
+    for (const g of set){ const k = fmtDay(g.ts,{weekday:"long",month:"long",year:"numeric"}); (days[k] = days[k] || []).push(g); }
+    const keys = Object.keys(days).sort((a,b) => Math.max(...days[b].map(g=>g.ts)) - Math.max(...days[a].map(g=>g.ts)));
+    html += `<div class="plate list" style="margin-top:12px">`;
+    for (const k of keys){
+      html += `<div class="dayhead">${esc(k)}</div>`;
+      for (const g of days[k].sort((a,b) => (a.rank||99) - (b.rank||99))){
+        const r = settle(g.result);
+        html += `<div class="li"><div class="vbadge" style="color:${hue(g.score)}">${g.score.toFixed(0)}</div>
+          <div class="main"><div class="t">${esc(g.home)} v ${esc(g.away)}</div><div class="m">${esc(g.comp)} · ${esc(fmtTime(g.ts))}${g.odds ? ` · odds ${g.odds.toFixed(2)}` : ""}${g.rank ? ` · ranked #${g.rank}` : ""}</div></div>
+          <span class="chip ${r.cls}">${r.txt}</span></div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  el.innerHTML = html;
+}
+const STATUS = {
+  covered:["green","Covered"], partial:["amber","Partly covered"], no_games:["grey","No games"],
+  omitted_budget:["amber","Omitted: request limit"], blocked_plan:["red","Blocked by plan"],
+  error:["red","Error"], not_found:["red","Not found in API"], not_available:["grey","Not on free plan"]
+};
+let covProblemsOnly = false;
+function renderCoverage(){
+  const el = $("#tab-coverage");
+  if (!COV){ el.innerHTML = `<h2 class="section">Coverage</h2><div class="plate empty"><b>No report yet</b></div>`; return; }
+  const ran = COV.generated_utc ? new Date(COV.generated_utc).toLocaleString("en-IE",{timeZone:TZ,dateStyle:"medium",timeStyle:"short"}) : "–";
+  const comps = COV.competitions || [];
+  const counts = {};
+  comps.forEach(c => counts[c.status] = (counts[c.status]||0) + 1);
+  let html = `<h2 class="section">Coverage report</h2>
+  <div class="plate covsum">
+    <div><span>Last run</span><b>${esc(ran)}</b></div>
+    <div><span>Mode / plan</span><b>${esc(COV.mode)} · ${esc(COV.plan)}</b></div>
+    <div><span>Requests used this run</span><b>${COV.requests_used}${COV.monthly_remaining != null ? ` · ${COV.monthly_remaining} left this month` : ` of ${COV.requests_available}`}</b></div>
+    ${COV.source ? `<div><span>Data source</span><b>${esc(COV.source)}</b></div>` : ""}
+    <div><span>Games scored</span><b>${COV.games_scored ?? "–"}</b></div>
+    <div><span>Competitions with games scored</span><b>${(counts.covered||0) + (counts.partial||0)}</b></div>
+    <div><span>No games today / not on free plan</span><b>${counts.no_games||0} / ${counts.not_available||0}</b></div>
+    <div><span>Problems</span><b>${(counts.omitted_budget||0)+(counts.blocked_plan||0)+(counts.error||0)+(counts.not_found||0)}</b></div>
+    ${(COV.notes||[]).length ? `<div><span>Notes</span><b style="text-align:right;font-weight:500">${COV.notes.map(esc).join("<br>")}</b></div>` : ""}
+    <div><span>Dropped: postponed / already started</span><b>${COV.dropped_postponed ?? 0} / ${COV.dropped_started ?? 0}</b></div>
+    <div><span>Games in competitions not on your list</span><b>${COV.other_competitions ?? 0} (ignored)</b></div>
+    ${COV.last_error ? `<div><span>Last error</span><b style="color:var(--red)">${esc(COV.last_error)}</b></div>` : ""}
+  </div>
+  <div class="subtabs" style="margin-top:12px"><button data-cv="all" class="${covProblemsOnly?"":"on"}">All ${comps.length}</button><button data-cv="prob" class="${covProblemsOnly?"on":""}">Problems only</button></div>
+  <div class="plate list">`;
+  for (const c of comps){
+    if (covProblemsOnly && ["covered","no_games","not_available"].includes(c.status)) continue;
+    const [cls, label] = STATUS[c.status] || ["grey", c.status];
+    let detail = "";
+    if (c.status === "covered" || c.status === "partial") detail = `${c.games} game${c.games===1?"":"s"}${D && D.odds_enabled !== false ? ` · ${c.with_odds} with odds` : ""}`;
+    else if (c.status === "omitted_budget") detail = `${c.games} game${c.games===1?"":"s"} skipped`;
+    const matched = (c.matched||[]).map(m => m.name).join(", ");
+    const more = c.matched_count > (c.matched||[]).length ? ` +${c.matched_count - c.matched.length} more` : "";
+    html += `<div class="li"><div class="vbadge" title="Your priority value">${c.value}</div>
+      <div class="main"><div class="t">${esc(c.name)}${c.newly_found ? ` <span class="chip green" style="margin-left:4px">New</span>` : ""}</div>
+      <div class="m">${matched ? esc(matched) + more : ""}${c.note ? (matched ? " · " : "") + esc(c.note) : ""}</div></div>
+      <div style="text-align:right"><span class="chip ${cls}">${label}</span>${detail ? `<div class="m" style="margin-top:4px">${detail}</div>` : ""}</div></div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+/* ---------- wiring ---------- */
+function show(tab){
+  for (const t of ["top","all","record","coverage"]) $("#tab-"+t).classList.toggle("hidden", t !== tab);
+  document.querySelectorAll("nav.tabs button").forEach(b => b.classList.toggle("on", b.dataset.tab === tab));
+  store.set("gs_tab", tab);
+  window.scrollTo(0, 0);
+  render(tab);
+}
+function render(tab){
+  tab = tab || store.get("gs_tab","top");
+  if (tab === "top") renderTop(); else if (tab === "all") renderAll(); else if (tab === "record") renderRecord(); else renderCoverage();
+}
+document.querySelector("nav.tabs").addEventListener("click", e => { const b = e.target.closest("button"); if (b) show(b.dataset.tab); });
+document.addEventListener("change", e => {
+  const box = e.target.closest("input[data-fid]");
+  if (!box) return;
+  const t = tracked(), fid = box.dataset.fid;
+  if (box.checked) t[fid] = Date.now(); else delete t[fid];
+  store.set("gs_tracked", t);
+  document.querySelectorAll(`input[data-fid="${fid}"]`).forEach(x => x.checked = box.checked);
+});
+document.addEventListener("click", e => {
+  const row = e.target.closest(".gr");
+  if (row && !e.target.closest("label.track")){
+    const d = document.querySelector(`[data-detail="${CSS.escape(row.dataset.row)}"]`);
+    if (d) d.classList.toggle("hidden");
+  }
+  const rv = e.target.closest("button[data-rv]"); if (rv){ recordView = rv.dataset.rv; renderRecord(); }
+  const cv = e.target.closest("button[data-cv]"); if (cv){ covProblemsOnly = cv.dataset.cv === "prob"; renderCoverage(); }
+});
+["input","change"].forEach(ev => { $("#q").addEventListener(ev, renderAll); });
+$("#fcomp").addEventListener("change", renderAll);
+$("#sort").addEventListener("change", e => { store.set("gs_sort", e.target.value); renderAll(); });
+let lastWide = null;
+window.addEventListener("resize", () => { const w = wide(); if (w !== lastWide){ lastWide = w; render(); } });
+setInterval(() => render(), 60 * 1000);   // keeps the kicked-off marks current
+document.addEventListener("visibilitychange", () => { if (!document.hidden) render(); });
+
+(async function start(){
+  [D, COV, HIST] = await Promise.all([getJSON("today.json"), getJSON("coverage.json"), getJSON("history.json")]);
+  header();
+  if (D){
+    const comps = [...new Set(D.games.map(g => g.comp))].sort();
+    $("#fcomp").innerHTML = `<option value="">All competitions</option>` + comps.map(c => `<option>${esc(c)}</option>`).join("");
+    if (D.odds_enabled === false) { const o = $("#sort").querySelector('option[value="odds"]'); if (o) o.remove(); }
+    $("#sort").value = store.get("gs_sort", "score") === "odds" && D.odds_enabled === false ? "score" : store.get("gs_sort", "score");
+  }
+  lastWide = wide();
+  show(store.get("gs_tab", "top"));
+})();
+if ("serviceWorker" in navigator && location.protocol === "https:") navigator.serviceWorker.register("sw.js").catch(() => {});
+})();
+</script>
+</body>
+</html>
 </head>
 <body>
 <header><div class="wrap hd">
