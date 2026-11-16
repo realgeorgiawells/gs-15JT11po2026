@@ -1,16 +1,41 @@
 {
- "_about": "Main settings for Goalscraper (data from OpenFootAPI's free plan).",
+ "_about": "Main settings for Goalscraper (data from OpenFootAPI's free plan). The model's learned adjustments live in data/model_state.json, not here.",
  "timezone": "Europe/Dublin",
  "run_time_local": "06:15",
  "window_hours": 24,
- "min_odds": 1.03,
  "top_n": 10,
- "weights": {
-  "_about": "form = how much recent games tweak long-term strength (0 to 1).",
-  "form": 0.15
+ "min_score": 50,
+ "min_score_international": 40,
+ "sections": {
+  "_about": "Each section's 1-100 scale is set by the chance of the pick going wrong: 'fail_at_100' scores 100, 'fail_at_50' scores 50 (the pass mark). Easy Goals goes wrong on a 0-0; Misses if the team wins; Ballon d'Or if the team doesn't win; Raining Goals if either team fails to score.",
+  "goals": {
+   "max_chance_of_goal": 0.97,
+   "fail_at_100": 0.03,
+   "fail_at_50": 0.065
+  },
+  "misses": {
+   "longest_price": 25,
+   "fail_at_100": 0.0385,
+   "fail_at_50": 0.25
+  },
+  "ballon": {
+   "min_favourite": 0.8,
+   "fail_at_100": 0.1,
+   "fail_at_50": 0.2
+  },
+  "btts": {
+   "fail_at_100": 0.28,
+   "fail_at_50": 0.4
+  }
  },
- "model": {
+ "starting_values": {
+  "_about": "Where the model starts. The daily self-adjustment moves these within limits; see the Coverage tab.",
+  "form_weight": 0.15,
   "strength_half_life_days": 240,
+  "draw_correction": -0.06
+ },
+ "self_adjust": true,
+ "model": {
   "form_half_life_days": 24,
   "prior_spread": 0.35,
   "form_spread": 0.15,
@@ -19,18 +44,16 @@
   "previous_season_weight": 0.5,
   "limited_data_games": 6,
   "limited_data_score_factor": 0.92,
-  "national_strength_scale": 0.7
+  "national_strength_scale": 0.7,
+  "international_window_days": 1095,
+  "international_half_life_days": 540,
+  "limited_data_games_international": 5
  },
- "score_scale": {
-  "_about": "Score 100 when P(0-0) is at or below 'p00_at_100', score 1 at or above 'p00_at_1' (log scale in between).",
-  "p00_at_100": 0.01,
-  "p00_at_1": 0.3
- },
- "history_days": 400,
  "requests": {
   "_about": "OpenFootAPI free plan: 5,000 requests a month. A normal day uses about 10-20; the first run uses more to collect the season so far.",
   "max_per_run": 600,
   "keep_in_reserve": 100,
   "sweep_days_back": 2
- }
+ },
+ "history_days": 400
 }
