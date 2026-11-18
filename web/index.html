@@ -167,6 +167,41 @@ nav button.on::before{content:"";position:absolute;top:0;left:25%;right:25%;heig
 .subtabs button.on{color:#1b1610;background:var(--gold);border-color:var(--gold)}
 .empty{padding:28px 16px;text-align:center;color:var(--mute)}
 .empty b{display:block;font:700 13px/1.4 var(--engraved);letter-spacing:2px;color:var(--gold);margin-bottom:6px}
+
+/* record tabs */
+.rtabs{display:grid;grid-template-columns:repeat(5,1fr);gap:4px;margin:2px 0 6px}
+.rtabs button{padding:8px 2px;min-height:40px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);color:var(--mute);
+  font:700 9.5px/1.25 var(--engraved);letter-spacing:.7px;cursor:pointer;text-transform:uppercase}
+.rtabs button.on{color:#1b1610;background:var(--gold);border-color:var(--gold)}
+.stat .v.big{font-size:30px}
+.stat .wl{font-size:12.5px;color:var(--mute);font-variant-numeric:tabular-nums;margin-top:2px}
+.stat .wl b{color:var(--text)}
+.small{font-size:12px;color:var(--faint);padding:8px 2px 0}
+.dayh{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:16px 2px 6px}
+.dayh b{font:700 11px/1.2 var(--engraved);letter-spacing:1.6px;color:var(--gold);text-transform:uppercase}
+.dayh span{font-size:12px;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+.cov .t .pk{color:var(--gold-hi)}
+.bandrow{display:grid;grid-template-columns:1fr auto auto;gap:12px;align-items:center;padding:9px 14px;border-top:1px solid var(--line);font-size:13px;font-variant-numeric:tabular-nums}
+.bandrow:first-child{border-top:0}.bandrow span:first-child{color:var(--mute)}.bandrow .r{font-weight:800;min-width:48px;text-align:right}
+/* all results */
+.fs{display:inline-block;min-width:38px;text-align:center;margin:0 6px;padding:1px 6px;border-radius:6px;background:#0d0f12;border:1px solid var(--line2);
+  font:800 14.5px/1.35 var(--plain);font-variant-numeric:tabular-nums;color:var(--text)}
+.mini.pk{border-color:rgba(201,165,74,.7);background:rgba(201,165,74,.12)}
+.mini .ok{color:var(--green);margin-left:3px}.mini .no{color:var(--red);margin-left:3px}
+.mini.nos{color:var(--faint)}
+.rescount{font-size:12px;color:var(--faint);padding:12px 2px 0}
+.chk{padding:10px 14px;border-top:1px solid var(--line)}
+.chk:first-child{border-top:0}
+.chk .hd2{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chk .hd2 b{font-size:14px}.chk .hd2 span{font-size:11.5px;color:var(--faint);white-space:nowrap}
+.chk .g4{display:grid;grid-template-columns:repeat(4,1fr);gap:4px;margin-top:7px}
+.chk .c{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:5px 4px;text-align:center;font-variant-numeric:tabular-nums}
+.chk .c i{display:block;font:700 8.5px/1.2 var(--engraved);font-style:normal;letter-spacing:.8px;color:var(--faint);text-transform:uppercase}
+.chk .c b{font-size:12.5px}.chk .c small{color:var(--faint);font-size:11px}
+.chk .c.off{border-color:rgba(224,166,58,.6);background:rgba(224,166,58,.1)}.chk .c.off b{color:#f2c56b}
+.chk.overall{background:rgba(201,165,74,.04)}
+.fold .rv{color:#f2c56b}
+.ft{color:var(--text);font-weight:800;font-variant-numeric:tabular-nums}
 </style>
 </head>
 <body>
@@ -198,11 +233,12 @@ nav button.on::before{content:"";position:absolute;top:0;left:25%;right:25%;heig
 <script>
 (function(){
 "use strict";
-let D = null, COV = null, REC = null;
+let D = null, COV = null, REC = null, RIDX = null;
+const MONTHS = {};
 const TZ = "Europe/Dublin";
 async function getJSON(name){
   try { const r = await fetch(`data/${name}?v=${Date.now()}`, {cache: "no-store"}); if (r.ok) return await r.json(); } catch (e) {}
-  return (window.__GS__ || {})[name.replace(".json", "")] || null;
+  return (window.__GS__ || {})[name.replace(".json", "")] || null;   // preview pages carry their data inline
 }
 const $ = s => document.querySelector(s);
 const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -230,6 +266,7 @@ const OPEN = new Set();
 /* ---------- pieces ---------- */
 function chips(g, key){
   const o = [];
+  if (g.tags.includes("postponed")) o.push(`<span class="chip red">Postponed</span>`);
   if (g.tags.includes("limited_data")) o.push(`<span class="chip amber">Limited data</span>`);
   if (g.tags.includes("time_tbc")) o.push(`<span class="chip grey">Time TBC</span>`);
   if (g.tags.includes("too_short") && (!key || key === "all")) o.push(`<span class="chip grey">Goals too short</span>`);
@@ -242,8 +279,9 @@ function teamsLine(g, key){
   return `${n("home")}<span class="v">v</span>${n("away")}`;
 }
 function subLine(g, key){
-  const st = now() >= g.ts;
-  return `<span class="tm">${tm(g.ts)}</span>${st ? `<span class="x">✕</span><span>${ago(now() - g.ts)}</span>` : ""}<span>·</span><span class="cp">${esc(g.comp)}</span>${chips(g, key)}`;
+  const st = now() >= g.ts && !g.tags.includes("postponed");
+  const done = g.result ? `<span class="x">✕</span><span class="ft">FT ${g.result[0]}–${g.result[1]}</span>` : st ? `<span class="x">✕</span><span>${ago(now() - g.ts)}</span>` : "";
+  return `<span class="tm">${tm(g.ts)}</span>${done}<span>·</span><span class="cp">${esc(g.comp)}</span>${chips(g, key)}`;
 }
 function rates(t){
   const c = v => `style="color:${hue(v)}"`;
@@ -293,7 +331,7 @@ function nextBest(key){
 function sectionView(key){
   const list = picks(key), S = SEC[key];
   let h = `<div class="sh"><h2>${S.name}</h2><p>${S.blurb()}</p>
-    <div class="meta">${list.length} pick${list.length === 1 ? "" : "s"} · minimum score ${D.min_club} (internationals ${D.min_intl}) · tap a game for details · next best below</div></div>`;
+    <div class="meta">${list.length} pick${list.length === 1 ? "" : "s"} · minimum score ${D.min_club} (internationals ${D.min_intl}${D.min_intl_end && D.min_intl < D.min_intl_end ? `, rising to ${D.min_intl_end}` : ""}) · tap a game for details · next best below</div></div>`;
   if (!list.length) return h + `<div class="note"><b>NO PICKS TODAY</b> &nbsp;No games reached the minimum score.</div>` + nextBest(key);
   h += `<div class="panel">${list.map(g => pickRow(g, key)).join("")}</div>`;
   if (list.length < D.top_n) h += `<div class="note"><b>ONLY ${list.length} PICK${list.length === 1 ? "" : "S"}</b> &nbsp;Only ${list.length} game${list.length === 1 ? "" : "s"} reached the minimum score today, so the list isn't padded with weaker ones.</div>`;
@@ -311,24 +349,25 @@ function selectedGames(){
 }
 function selRow({g, labels}){
   return `<div class="row srow" data-open="sel-${g.fid}">
-    <div class="ko">${tm(g.ts)}${now() >= g.ts ? `<small class="x">✕ ${ago(now() - g.ts)}</small>` : ""}</div>
+    <div class="ko">${tm(g.ts)}${g.result ? `<small class="x">✕ <span class="ft">FT ${g.result[0]}–${g.result[1]}</span></small>` : now() >= g.ts && !g.tags.includes("postponed") ? `<small class="x">✕ ${ago(now() - g.ts)}</small>` : ""}</div>
     <div class="mid"><div class="teams">${esc(g.home.name)}<span class="v">v</span>${esc(g.away.name)}</div>
       <div class="sub"><span class="cp">${esc(g.comp)}</span>${chips(g, "sel")}</div>
       <div class="labels">${labels.map(l => `<span class="chip gold">${esc(l)}</span>`).join("")}</div></div></div>${details(g, "sel")}`;
 }
 let foldOpen = false;
 function selectedView(){
-  const all = selectedGames(), up = all.filter(x => x.g.ts > now()), st = all.filter(x => x.g.ts <= now());
+  const pp = x => x.g.tags.includes("postponed") || !!x.g.result;
+  const all = selectedGames(), up = all.filter(x => x.g.ts > now() && !pp(x)), st = all.filter(x => x.g.ts <= now() || pp(x));
   let h = `<div class="sh"><h2>Selected games</h2><p>Every pick from Easy Goals, Misses and Ballon d'Or, in kickoff order.</p></div>`;
   if (up.length) {
     const n = up[0].g;
     h += `<div class="count"><div class="k">NEXT KICK-OFF</div><div class="t" id="cd">--:--:--</div>
       <div class="g">${esc(n.home.name)} v ${esc(n.away.name)}</div><div class="m">${tm(n.ts)} · ${esc(n.comp)}</div></div>`;
   }
-  h += `<div class="sh" style="padding-top:14px"><div class="meta">${up.length} to come · ${st.length} already started</div></div>`;
+  h += `<div class="sh" style="padding-top:14px"><div class="meta">${up.length} to come · ${st.length} already started${st.some(x => x.g.tags.includes("postponed")) ? " or postponed" : ""}${D.updated_utc ? ` · results updated ${tm(Date.parse(D.updated_utc) / 1000)}` : ""}</div></div>`;
   h += up.length ? `<div class="panel">${up.map(selRow).join("")}</div>` : `<div class="note"><b>ALL STARTED</b> &nbsp;Every selected game has kicked off.</div>`;
   if (st.length) {
-    h += `<button class="fold ${foldOpen ? "open" : ""}" id="fold"><span>ALREADY STARTED (${st.length})</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
+    h += `<button class="fold ${foldOpen ? "open" : ""}" id="fold"><span>ALREADY STARTED${st.some(x => x.g.tags.includes("postponed")) ? " / POSTPONED" : ""} (${st.length})</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
     if (foldOpen) h += `<div class="panel" style="margin-top:8px">${st.map(selRow).join("")}</div>`;
   }
   return h;
@@ -355,31 +394,132 @@ function allRows(){
   }).join("");
 }
 const SECNAME = {goals: "Easy Goals", misses: "Misses", ballon: "Ballon d'Or", btts: "Raining Goals"};
+const SHORT = {goals: "EG", misses: "MI", ballon: "BD", btts: "RG"};
+let compOpen = false, chkOpen = false, recTab = "goals", recDays = 7, resMine = true, resDate = "3", resComp = "", resQ = "";
+const dayName = d => new Intl.DateTimeFormat("en-IE", {timeZone: "UTC", weekday: "long", day: "numeric", month: "long"}).format(new Date(d + "T12:00:00Z"));
+const dayShort = d => new Intl.DateTimeFormat("en-IE", {timeZone: "UTC", weekday: "short", day: "numeric", month: "short"}).format(new Date(d + "T12:00:00Z"));
+const monthName = m => new Intl.DateTimeFormat("en-IE", {timeZone: "UTC", month: "long", year: "numeric"}).format(new Date(m + "-15T12:00:00Z"));
+const dayOf = t => new Intl.DateTimeFormat("en-CA", {timeZone: TZ}).format(new Date(t * 1000));
+const rate = s => { const n = s.won + s.lost; return n ? (s.won / n * 100).toFixed(1) + "%" : "–"; };
+const BACK = `<button class="back" data-back><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>BACK</button>`;
+const fold = (attr, open, label) => `<button class="fold ${open ? "open" : ""}" ${attr}><span>${label}</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
+
 function recordView(){
-  const back = `<button class="back" data-back><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>BACK</button>`;
-  if (!REC) return back + `<div class="empty"><b>NO RECORD YET</b>Picks are settled the morning after they're made.</div>`;
-  const rate = s => { const n = s.won + s.lost; return n ? (s.won / n * 100).toFixed(1) + "%" : "–"; };
-  const card = k => { const s = REC.sections[k]; return `<div class="stat"><div class="k">${SECNAME[k]}</div><div class="v">${rate(s.d30)}</div>
-    <div class="s">${s.d30.won} of ${s.d30.won + s.d30.lost} picks · last 30 days<br>All time ${rate(s.all)} (${s.all.won + s.all.lost})</div></div>`; };
-  let h = back + `<div class="sh"><h2>Record</h2><p>How each section's picks have done. A pick counts once settled; void games don't count.</p></div>
-    <div class="stats">${["goals", "misses", "ballon", "btts"].map(card).join("")}</div>`;
-  if ((REC.check || []).length) {
-    h += `<div class="sh"><h2 style="font-size:12px">Model check</h2><p>Last 90 days: does the model's confidence match what happened?</p></div>
-      <div class="panel">${REC.check.map(c => `<div class="kv"><span>${esc(c.label)}</span><b>${c.forecast} forecast · ${c.actual} actual</b></div>`).join("")}</div>`;
+  let h = BACK + `<div class="sh"><h2>Record</h2><p>How Goalscraper's picks have done, and every result it has stored. Results come in at about 6 pm and 6:15 am.</p></div>
+    <div class="rtabs">${[["goals", "Easy<br>Goals"], ["misses", "Misses"], ["ballon", "Ballon<br>d'Or"], ["btts", "Raining<br>Goals"], ["all", "All<br>results"]]
+      .map(([k, l]) => `<button data-rt="${k}" class="${recTab === k ? "on" : ""}">${l}</button>`).join("")}</div>`;
+  if (recTab === "all") return h + resultsView();
+  if (!REC) return h + `<div class="empty"><b>NO RECORD YET</b>Picks are settled once their games have finished.</div>`;
+  return h + recSection(recTab);
+}
+function recSection(key){
+  const S = REC.sections[key];
+  const card = (title, s) => `<div class="stat"><div class="k">${title}</div><div class="v big" style="color:${s.won + s.lost ? hue(s.won / (s.won + s.lost) * 100) : "var(--mute)"}">${rate(s)}</div>
+    <div class="wl"><b>${s.won}</b> won · <b>${s.lost}</b> lost${s.void ? ` · ${s.void} void` : ""}</div></div>`;
+  let h = `<div class="stats">${card("Last 30 days", S.d30)}${card("All time", S.all)}</div>`;
+  const extra = [];
+  if (S.pending) extra.push(`${S.pending} pick${S.pending === 1 ? "" : "s"} waiting for results`);
+  if (S.v1) extra.push(`${S.v1} first-version pick${S.v1 === 1 ? "" : "s"} shown below but not counted`);
+  if (extra.length) h += `<div class="small">${extra.join(" · ")}</div>`;
+  if ((S.bands || []).length) {
+    h += `<div class="sh" style="padding-bottom:6px"><h2 style="font-size:12px">By score</h2><p>Do higher scores win more often? All time.</p></div><div class="panel">` +
+      S.bands.map(b => `<div class="bandrow"><span>${esc(b.label)}</span><span>${b.won} won · ${b.lost} lost</span><span class="r" style="color:${hue(b.won / Math.max(1, b.won + b.lost) * 100)}">${rate(b)}</span></div>`).join("") + `</div>`;
   }
-  if ((REC.recent || []).length) {
-    h += `<div class="sh"><h2 style="font-size:12px">Last 7 days</h2></div>`;
-    for (const d of REC.recent) {
-      const day = new Intl.DateTimeFormat("en-IE", {timeZone: TZ, weekday: "long", day: "numeric", month: "long"}).format(new Date(d.date + "T12:00:00Z"));
-      h += `<div class="daystr">${esc(day)}</div><div class="panel" style="margin-top:6px">` + d.picks.map(p => {
-        const team = p.team ? ` · ${esc(p.team === "home" ? p.h : p.a)}` : "";
-        const res = p.res === "pending" ? "Pending" : p.res === "void" ? "Void" : `${p.result[0]}–${p.result[1]} ${p.res === "won" ? "✓" : "✕"}`;
-        return `<div class="cov"><div class="vb" style="color:${hue(p.score)}">${Math.round(p.score)}</div>
-          <div><div class="t">${esc(p.h)} v ${esc(p.a)}</div><div class="m">${SECNAME[p.section]} #${p.rank}${team} · ${esc(p.comp)}</div></div>
-          <span class="res ${p.res}">${res}</span></div>`; }).join("") + `</div>`;
-    }
+  if ((S.comps || []).length) {
+    const tot = S.all.won + S.all.lost, avg = tot ? S.all.won / tot : 0;
+    h += fold("data-comp", compOpen, `BY COMPETITION (${S.comps.length})`);
+    if (compOpen) h += `<div class="small">All time, most picks first. <span class="chip amber">Below average</span> marks a competition with 5+ picks doing noticeably worse than this section overall (${rate(S.all)}).</div><div class="panel" style="margin-top:8px">` +
+      S.comps.map(c => { const n = c.won + c.lost, r = n ? c.won / n : 0, weak = n >= 5 && r < avg - 0.1;
+        return `<div class="bandrow"><span>${esc(c.comp)}${weak ? ` <span class="chip amber">Below average</span>` : ""}${n < 5 ? ` <span class="chip grey">Few picks</span>` : ""}</span><span>${c.won} won · ${c.lost} lost</span><span class="r" style="color:${n ? hue(r * 100) : "var(--mute)"}">${rate(c)}</span></div>`; }).join("") + `</div>`;
   }
+  const days = REC.days.map(d => ({date: d.date, picks: d.picks.filter(p => p.section === key && p.res !== "pending")})).filter(d => d.picks.length);
+  if (!days.length) return h + `<div class="empty"><b>NOTHING SETTLED YET</b>Picks appear here once their games have finished.</div>`;
+  for (const d of days.slice(0, recDays)) {
+    const w = d.picks.filter(p => p.res === "won" && !p.v1).length, n = d.picks.filter(p => p.res !== "void" && !p.v1).length;
+    h += `<div class="dayh"><b>${esc(dayName(d.date))}</b><span>${n ? `${w} of ${n} won` : "not counted"}</span></div><div class="panel">` + d.picks.map(p => {
+      const nm = side => { const t = esc(side === "home" ? p.h : p.a); return p.team === side ? `<span class="pk">${t}</span>` : t; };
+      const who = esc(p.team === "home" ? p.h : p.a);
+      const what = key === "misses" ? ` · ${who} not to win` : key === "ballon" ? ` · ${who} to win` : "";
+      const res = p.res === "void" ? "Void" : `${p.result[0]}–${p.result[1]} ${p.res === "won" ? "✓" : "✕"}`;
+      return `<div class="cov"><div class="vb" style="color:${hue(p.score)}">${Math.round(p.score)}</div>
+        <div><div class="t">${nm("home")} v ${nm("away")}</div><div class="m">${p.rank ? `#${p.rank}` : ""}${what} · ${esc(p.comp)}${p.v1 ? ` <span class="chip grey">First version</span>` : ""}</div></div>
+        <span class="res ${p.res}">${res}</span></div>`; }).join("") + `</div>`;
+  }
+  if (days.length > recDays) h += fold("data-older", false, `SHOW OLDER (${days.length - recDays} MORE DAY${days.length - recDays === 1 ? "" : "S"})`);
   return h;
+}
+
+/* ---------- all results ---------- */
+function resultsView(){
+  if (!RIDX) return `<div class="empty"><b>NO RESULTS YET</b>Results appear after the next run.</div>`;
+  const recent = RIDX.days.slice(0, 30), covered = new Set(recent.map(d => d.slice(0, 7)));
+  const dOpts = [["3", "Last 3 days"], ["7", "Last 7 days"], ["30", "Last 30 days"], ...recent.map(d => [d, dayShort(d)]),
+    ...RIDX.months.filter(m => !covered.has(m) || m < recent[recent.length - 1]?.slice(0, 7)).map(m => ["m:" + m, monthName(m)])];
+  return `<div class="subtabs" style="margin-top:4px"><button data-rm="1" class="${resMine ? "on" : ""}">YOUR COMPETITIONS</button><button data-rm="0" class="${resMine ? "" : "on"}">EVERYTHING</button></div>
+    <div class="controls"><input id="rq" placeholder="Search team or competition" value="${esc(resQ)}">
+    <select id="rc"><option value="">All competitions</option></select>
+    <select id="rd">${dOpts.map(([v, l]) => `<option value="${v}" ${v === resDate ? "selected" : ""}>${esc(l)}</option>`).join("")}</select></div>
+    ${checkFold()}<div class="rescount" id="rcount"></div><div id="resList"><div class="empty"><b>LOADING</b></div></div>`;
+}
+function checkFold(){
+  const C = RIDX && RIDX.check; if (!C || !C.rows.length) return "";
+  const rv = C.rows.filter(r => r.review).length;
+  let h = fold("data-chk", chkOpen, `MODEL CHECK${rv ? ` · <span class="rv">${rv} TO REVIEW</span>` : ""}`);
+  if (!chkOpen) return h;
+  const L = {p00: "0-0", draw: "Draws", home: "Home wins", btts: "Both score"};
+  const rows = C.rows.filter(r => !resComp || r.overall || r.comp === resComp)
+    .sort((a, b) => (b.overall - a.overall) || (b.review - a.review) || (b.n - a.n));
+  h += `<div class="small">Every game Goalscraper rated in the last ${C.days} days, not just picks. Forecast → actual, per 100 games. <span class="chip amber">Review</span> means a gap too big to be bad luck, so the model may be off there. Under ${C.min_games} games isn't flagged.</div><div class="panel" style="margin-top:8px">` +
+    rows.map(r => `<div class="chk ${r.overall ? "overall" : ""}"><div class="hd2"><b>${esc(r.comp)} ${r.review ? `<span class="chip amber">Review</span>` : ""}${r.n < C.min_games ? `<span class="chip grey">Few games</span>` : ""}</b><span>${r.n} games</span></div>
+      <div class="g4">${Object.entries(L).map(([k, l]) => { const m = r.m[k]; return `<div class="c ${m.off ? "off" : ""}"><i>${l}</i><small>${m.f.toFixed(0)} → </small><b>${m.a.toFixed(0)}</b></div>`; }).join("")}</div></div>`).join("") + `</div>`;
+  return h;
+}
+async function loadMonth(m){
+  if (MONTHS[m]) return MONTHS[m];
+  const raw = (await getJSON(`results/${m}.json`)) || [];
+  return MONTHS[m] = raw.map(g => ({fid: g.id, ts: g.t, comp: g.c, mine: !!g.m, h: g.h, a: g.a, r: g.r, v1: g.v1,
+    s: g.s ? Object.fromEntries(Object.entries(g.s).map(([k, v]) => [k, {score: v[0], rank: v[1], pick: !!v[2], team: v[3], listed: v[1] != null}])) : null}));
+}
+let resSeq = 0;
+async function resRows(){
+  const seq = ++resSeq, list = $("#resList"); if (!list || !RIDX) return;
+  let days = null, months;
+  if (resDate.startsWith("m:")) months = [resDate.slice(2)];
+  else {
+    days = /^\d+$/.test(resDate) ? RIDX.days.slice(0, +resDate) : [resDate];
+    months = [...new Set(days.flatMap(d => { const m = d.slice(0, 7), prev = new Date(Date.UTC(+m.slice(0, 4), +m.slice(5, 7) - 2, 15)).toISOString().slice(0, 7);
+      return d.endsWith("-01") ? [m, prev] : [m]; }))].filter(m => RIDX.months.includes(m));
+  }
+  const all = (await Promise.all(months.map(loadMonth))).flat();
+  if (seq !== resSeq) return;
+  const inRange = all.filter(g => (!resMine || g.mine) && (!days || days.includes(dayOf(g.ts))));
+  const sel = $("#rc"), comps = [...new Set(inRange.map(g => g.comp))].sort();
+  if (resComp && !comps.includes(resComp)) comps.unshift(resComp);
+  sel.innerHTML = `<option value="">All competitions</option>` + comps.map(c => `<option ${c === resComp ? "selected" : ""}>${esc(c)}</option>`).join("");
+  const q = resQ.toLowerCase();
+  const l = inRange.filter(g => (!resComp || g.comp === resComp) && (g.h + " " + g.a + " " + g.comp).toLowerCase().includes(q)).sort((a, b) => b.ts - a.ts);
+  const picks = l.filter(g => g.s && Object.values(g.s).some(v => v.pick)).length;
+  $("#rcount").textContent = `${l.length} result${l.length === 1 ? "" : "s"} · ${picks} with picks · gold = a Goalscraper pick`;
+  const mini = (k, v, g) => {
+    if (!v.listed) return k === "goals" ? `<span class="mini"><i>EG</i>short</span>` : "";
+    if (!v.pick) return `<span class="mini" style="color:${hue(v.score)}"><i>${SHORT[k]}</i>${Math.round(v.score)}</span>`;
+    const ok = g.r && (k === "goals" ? g.r[0] + g.r[1] > 0 : k === "btts" ? g.r[0] > 0 && g.r[1] > 0 :
+      (k === "misses") !== (v.team === "home" ? g.r[0] > g.r[1] : g.r[1] > g.r[0]));
+    return `<span class="mini pk" style="color:${hue(v.score)}"><i>${SHORT[k]}</i>${Math.round(v.score)}${!g.r ? "" : ok ? `<span class="ok">✓</span>` : `<span class="no">✕</span>`}</span>`;
+  };
+  const shown = l.slice(0, 400);
+  let h = "", cur = "";
+  for (const g of shown) {
+    const d = dayOf(g.ts);
+    if (d !== cur) { h += (cur ? `</div>` : "") + `<div class="dayh"><b>${esc(dayName(d))}</b><span>${l.filter(x => dayOf(x.ts) === d).length} results</span></div><div class="panel">`; cur = d; }
+    const sc = g.r ? `<span class="fs">${g.r[0]}–${g.r[1]}</span>` : `<span class="fs" style="color:var(--mute)">–</span>`;
+    const minis = !g.s ? (g.mine ? "" : `<span class="mini nos">Not one of your competitions</span>`) :
+      ["goals", "misses", "ballon", "btts"].filter(k => g.s[k]).map(k => mini(k, g.s[k], g)).join("");
+    h += `<div class="row srow"><div class="ko">${tm(g.ts)}</div><div class="mid"><div class="teams">${esc(g.h)}${sc}${esc(g.a)}</div>
+      <div class="sub"><span class="cp">${esc(g.comp)}</span>${g.v1 ? `<span class="chip grey">First version</span>` : ""}</div>${minis ? `<div class="minis">${minis}</div>` : ""}</div></div>`;
+  }
+  if (l.length > shown.length) h += `</div><div class="note"><b>SHOWING 400 OF ${l.length}</b> &nbsp;Narrow it down with search, a competition or a single day.`;
+  list.innerHTML = l.length ? h + `</div>` : `<div class="empty"><b>NO RESULTS</b>Nothing matches these filters.</div>`;
 }
 const STATUS = {covered: ["green", "Covered"], partial: ["amber", "Partly covered"], no_games: ["grey", "No games"],
   omitted_budget: ["amber", "Omitted: request limit"], blocked_plan: ["red", "Blocked"], error: ["red", "Error"],
@@ -398,6 +538,10 @@ function coverageView(){
     <div class="kv"><span>Competitions with games</span><b>${(cnt.covered || 0) + (cnt.partial || 0)} of ${comps.length}</b></div>
     <div class="kv"><span>Not on free plan</span><b>${cnt.not_available || 0}</b></div>
     <div class="kv"><span>Problems</span><b>${(cnt.omitted_budget || 0) + (cnt.blocked_plan || 0) + (cnt.error || 0)}</b></div>
+    ${COV.evening ? `<div class="kv"><span>Evening update</span><b>${esc(new Date(COV.evening.at).toLocaleString("en-IE", {timeZone: TZ, dateStyle: "medium", timeStyle: "short"}))} · ${COV.evening.requests_used} requests</b></div>` : ""}
+    ${COV.evening && COV.evening.error ? `<div class="kv"><span>Evening problem</span><b style="color:var(--red)">${esc(COV.evening.error)}</b></div>` : ""}
+    ${COV.model && COV.model.intl_pass ? `<div class="kv"><span>International pass mark</span><b>${COV.model.intl_pass.value}${COV.model.intl_pass.value < COV.model.intl_pass_end ? ` · ${COV.model.intl_pass.paused ? "rise paused (model check)" : `next point at ${COV.model.intl_pass.next_at} games`} (${COV.model.intl_pass.games} so far)` : ""}</b></div>` : ""}
+    ${COV.archive_months ? `<div class="kv"><span>Results archive</span><b>${COV.archive_months} month${COV.archive_months === 1 ? "" : "s"}</b></div>` : ""}
     <div class="kv"><span>Dropped: postponed / already started</span><b>${COV.dropped_postponed ?? 0} / ${COV.dropped_started ?? 0}</b></div>
     ${COV.last_error ? `<div class="kv"><span>Last error</span><b style="color:var(--red)">${esc(COV.last_error)}</b></div>` : ""}</div>`;
   const md = COV.model || {};
@@ -426,6 +570,9 @@ function howView(){
     <h3>Raining Goals</h3>Goes wrong if either team fails to score.
     <h3>Team strength</h3>Attack and defence ratings come from every result, adjusted for the opponent and the league, and update every morning. Recent form counts a little extra. National teams use three years of internationals.
     <h3>Learning from results</h3>Every prediction is stored and checked against what happened. Each morning, settings are nudged where the evidence shows the forecasts are off, separately for clubs and internationals. Changes are listed on the Coverage screen.
+    <h3>Updates</h3>The list is made once, at 6:15 each morning, and covers the next 24 hours. At about 6 pm a short update marks postponed games and adds the results so far; it never changes picks or scores.
+    <h3>International pass mark</h3>Internationals start with a lower pass mark because national teams play few games, which keeps their scores lower. It rises 1 point for every 50 international games Goalscraper has predicted and settled, up to the club mark, and pauses while the model check flags internationals.
+    <h3>Record</h3>Each section's tab shows its hit rate over the last 30 days and all time, how each score band and competition has done, and every settled pick by day. All results holds every result stored, with Goalscraper's scores for the games it rated, and the model check: forecast against actual for each competition, flagged when the gap is too big to be bad luck.
     <h3>All games</h3>Each game shows its score in every section: EG = Easy Goals, BD = Ballon d'Or, MI = Misses, RG = Raining Goals.
     <h3>Reality check</h3>Scores are a ranking, not a guarantee. At short prices one losing pick can wipe out many winners. The Record screen shows how each section is really doing.</div>`;
 }
@@ -447,7 +594,7 @@ function render(){
   const m = $("#main");
   if (!D) { m.innerHTML = `<div class="empty"><b>NO DATA YET</b>The first morning run hasn't finished. Run it from GitHub's Actions tab.</div>`; return; }
   if (page === "all") { m.innerHTML = allView(); allRows(); }
-  else if (page === "record") m.innerHTML = recordView();
+  else if (page === "record") { m.innerHTML = recordView(); if (recTab === "all") resRows(); }
   else if (page === "coverage") m.innerHTML = coverageView();
   else if (page === "how") m.innerHTML = howView();
   else m.innerHTML = tab === "selected" ? selectedView() : sectionView(tab);
@@ -456,7 +603,7 @@ function render(){
 }
 function tick(){
   const el = $("#cd"); if (!el) return;
-  const up = selectedGames().filter(x => x.g.ts > now());
+  const up = selectedGames().filter(x => x.g.ts > now() && !x.g.tags.includes("postponed") && !x.g.result);
   if (!up.length) return;
   let s = Math.max(0, Math.round(up[0].g.ts - now()));
   const days = Math.floor(s / 86400); s -= days * 86400;
@@ -472,17 +619,27 @@ $("#sheet").addEventListener("click", e => { const b = e.target.closest("button"
 document.addEventListener("click", e => {
   if (e.target.closest("[data-back]")) { page = null; render(); return; }
   if (e.target.closest("#fold")) { foldOpen = !foldOpen; render(); return; }
+  const rt = e.target.closest("[data-rt]"); if (rt) { recTab = rt.dataset.rt; recDays = 7; render(); return; }
+  if (e.target.closest("[data-older]")) { recDays += 7; keepScroll(); return; }
+  if (e.target.closest("[data-comp]")) { compOpen = !compOpen; keepScroll(); return; }
+  if (e.target.closest("[data-chk]")) { chkOpen = !chkOpen; keepScroll(); return; }
+  const rm = e.target.closest("[data-rm]"); if (rm) { resMine = rm.dataset.rm === "1"; resComp = ""; keepScroll(); return; }
   const cv = e.target.closest("[data-cv]"); if (cv) { covProblems = cv.dataset.cv === "prob"; render(); return; }
   const nb = e.target.closest("[data-next]"); if (nb) { nextOpen[nb.dataset.next] = !nextOpen[nb.dataset.next]; render(); return; }
   const r = e.target.closest("[data-open]");
   if (r) { const d = document.querySelector(`[data-det="${CSS.escape(r.dataset.open)}"]`);
     if (d) { d.classList.toggle("open"); d.classList.contains("open") ? OPEN.add(r.dataset.open) : OPEN.delete(r.dataset.open); } }
 });
-document.addEventListener("input", e => { if (e.target.id === "q") allRows(); });
-document.addEventListener("change", e => { if (e.target.id === "fc" || e.target.id === "so") allRows(); });
+document.addEventListener("input", e => { if (e.target.id === "q") allRows(); if (e.target.id === "rq") { resQ = e.target.value; resRows(); } });
+document.addEventListener("change", e => { if (e.target.id === "fc" || e.target.id === "so") allRows();
+  if (e.target.id === "rc") { resComp = e.target.value; keepScroll(); }
+  if (e.target.id === "rd") { resDate = e.target.value; resRows(); } });
+function keepScroll(){ const y = window.scrollY; render(); window.scrollTo(0, y); }
 setInterval(() => { if (!page || page === "all") { const y = window.scrollY; render(); window.scrollTo(0, y); } }, 60000);
 (async function start(){
-  [D, COV, REC] = await Promise.all([getJSON("today.json"), getJSON("coverage.json"), getJSON("record.json")]);
+  [D, COV, REC, RIDX] = await Promise.all([getJSON("today.json"), getJSON("coverage.json"), getJSON("record.json"), getJSON("results/index.json")]);
+  if (REC) for (const d of REC.days) d.picks = d.picks.map(p => ({ts: p.t, h: p.h, a: p.a, comp: p.c, section: p.k, team: p.tm,
+    score: p.s, rank: p.rk, result: p.r, res: p.res, v1: p.v1}));
   banners();
   render();
 })();

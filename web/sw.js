@@ -1,6 +1,6 @@
 // Goalscraper: always try the network first so you get this morning's data;
 // if you're offline, show the last copy that loaded.
-const CACHE = "goalscraper-v1";
+const CACHE = "goalscraper-v3";
 self.addEventListener("install", () => self.skipWaiting());
 self.addEventListener("activate", e => e.waitUntil(
   caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))

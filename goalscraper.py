@@ -5,11 +5,14 @@ Goalscraper: each morning, rate every game in the next 24 hours for four section
   Raining Goals (both teams to score). Every prediction is stored, settled and used to self-adjust the model.
 Data: OpenFootAPI (free Starter plan, 5,000 requests a month).
 
-  python goalscraper.py                    # normal daily run (needs OPENFOOT_API_KEY)
+  python goalscraper.py                    # full run: new list for the next 24 hours (needs OPENFOOT_API_KEY)
+  python goalscraper.py --evening          # evening update: results so far and postponements, no new list
   python goalscraper.py --mock             # simulated data, no key needed (for testing)
 
-Results are kept in data/store.json between runs, so after the first run only the last couple of days are
-fetched. Writes data/*.json and site/ (the app that gets published). Python 3.9+, no packages needed.
+Scheduled on GitHub: the full run at 6:15 and the evening update at 18:00, Irish time.
+Results are kept in data/store.json between runs (GitHub's cache), so only the last couple of days are fetched,
+and every result is also kept for good in data/archive/ (one file per month), which rebuilds the store if the
+cache is ever lost. Writes data/*.json and site/ (the app that gets published). Python 3.9+, no packages needed.
 """
 import argparse
 import base64
@@ -262,6 +265,83 @@ class Store:
 
 
 # ----------------------------------------------------------------------------------------------
+# Permanent results archive (data/archive/, committed to the repository, never pruned)
+#   YYYY-MM.json:      id -> [comp, season, ts, home name, away name, home goals, away goals, status, round, home id, away id]
+#   teams.json:        id -> [name, home competition, country]
+#   competitions.json: id -> {name, country}
+#   meta.json:         which seasons have been collected, so a rebuilt store needs no extra requests
+# ----------------------------------------------------------------------------------------------
+FINAL_STATUSES = ("finished", "cancelled", "abandoned", "awarded")
+
+
+def month_of(ts):
+    return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m")
+
+
+class Archive:
+    def __init__(self, folder):
+        self.folder = Path(folder)
+        self.months, self.dirty = {}, set()
+
+    def months_on_disk(self):
+        return sorted(p.stem for p in self.folder.glob("[0-9][0-9][0-9][0-9]-[0-9][0-9].json"))
+
+    def load(self, month):
+        if month not in self.months:
+            self.months[month] = load_json(self.folder / f"{month}.json", {})
+        return self.months[month]
+
+    def update_from(self, store, since_ts):
+        """Copy every final result in the store (from since_ts on) into the archive. Nothing is ever removed."""
+        added = 0
+        for mid, v in store.matches.items():
+            if v[7] not in FINAL_STATUSES or v[2] < since_ts:
+                continue
+            m = month_of(v[2])
+            rows = self.load(m)
+            th = store.teams.get(v[3]) or [v[3]]
+            ta = store.teams.get(v[4]) or [v[4]]
+            row = [v[0], v[1], v[2], th[0] or v[3], ta[0] or v[4], v[5], v[6], v[7], v[8], v[3], v[4]]
+            if rows.get(mid) != row:
+                added += mid not in rows
+                rows[mid] = row
+                self.dirty.add(m)
+        for name, new in (("teams.json", store.teams),
+                          ("competitions.json", {k: v for k, v in store.comps.items() if k != "_fetched"})):
+            old = load_json(self.folder / name, {})
+            merged = {**old, **new}
+            if merged != old:
+                save_json(self.folder / name, merged)
+        meta = {"backfilled": store.backfilled, "seasons": store.seasons, "last_sweep": store.last_sweep}
+        if load_json(self.folder / "meta.json", {}) != meta:
+            save_json(self.folder / "meta.json", meta)
+        return added
+
+    def save(self):
+        for m in self.dirty:
+            save_json(self.folder / f"{m}.json", self.months[m])
+        self.dirty = set()
+
+    def rebuild_store(self, store, keep_after_ts, longer_after_ts):
+        """GitHub's cache was empty: refill the store from the archive (international results are kept longer)."""
+        n = 0
+        for m in self.months_on_disk():
+            if m < month_of(longer_after_ts):
+                continue
+            for mid, r in self.load(m).items():
+                if r[2] >= longer_after_ts:
+                    store.matches[mid] = [r[0], r[1], r[2], r[9], r[10], r[5], r[6], r[7], r[8], True]
+                    n += 1
+        store.teams = load_json(self.folder / "teams.json", {})
+        store.comps = load_json(self.folder / "competitions.json", {})
+        meta = load_json(self.folder / "meta.json", {})
+        store.backfilled = meta.get("backfilled", {})
+        store.seasons = meta.get("seasons", {})
+        store.last_sweep = meta.get("last_sweep")
+        return n
+
+
+# ----------------------------------------------------------------------------------------------
 # Rating model: opposition-adjusted Poisson attack/defence with priors (see README)
 # ----------------------------------------------------------------------------------------------
 def fit_pool(matches, priors, spread, half_life_days, ref_ts, iters=40):
@@ -384,6 +464,13 @@ def calibrated(lh, la, group, ms):
 DEFAULT_AT1 = {"goals": 0.30, "misses": 0.60, "ballon": 0.45, "btts": 0.80}
 
 
+def intl_pass_cfg(S):
+    """(start, end, games per point) for the international pass mark, which rises as international results build up."""
+    c = S.get("international_pass_mark") or {}
+    start = c.get("start", S.get("min_score_international", 40))
+    return start, c.get("end", S["min_score"]), max(1, c.get("games_per_point", 50))
+
+
 def scale_score(fail, at100, at50, at1, knot=40):
     """1-100 from the chance of the pick going wrong, on a log scale: at100 -> 100 and at50 -> 50 (the pass mark).
     That line carries on down to the lowest pass mark ('knot', 40 for internationals), so no pick's score changes;
@@ -400,7 +487,7 @@ def scale_score(fail, at100, at50, at1, knot=40):
 def section_scores(p, S):
     """Returns {section: {...}} with listed / score / team / p for one game's probabilities."""
     sec = S["sections"]
-    knot = min(S["min_score"], S["min_score_international"])
+    knot = min(S["min_score"], intl_pass_cfg(S)[0])      # fixed at the lowest pass mark, so the scale never moves
     sc = lambda f, k: scale_score(f, sec[k]["fail_at_100"], sec[k]["fail_at_50"], sec[k].get("fail_at_1", DEFAULT_AT1[k]), knot)
     out = {}
     g = sec["goals"]
@@ -451,6 +538,10 @@ class PredLog:
             self.load(d.strftime("%Y-%m"))
             d = (d + timedelta(days=32)).replace(day=1)
 
+    def load_all(self):
+        for p in sorted(self.folder.glob("[0-9][0-9][0-9][0-9]-[0-9][0-9].json")):
+            self.load(p.stem)
+
     def put(self, fid, entry, replay=False):
         m = self.load(self.month_of(entry["ts"]))
         old = m.get(fid)
@@ -481,6 +572,19 @@ class PredLog:
                     continue
                 self.dirty.add(month)
 
+    def mark_old_replays(self):
+        """Earlier versions didn't mark replayed games. They're the ones never ranked (no rank in Raining Goals,
+        where every real prediction has one)."""
+        n = 0
+        for month, m in self.months.items():
+            for e in m.values():
+                b = (e.get("s") or {}).get("btts")
+                if not e.get("rp") and not e.get("v1") and b and b[1] is None:
+                    e["rp"] = 1
+                    self.dirty.add(month)
+                    n += 1
+        return n
+
     def save(self):
         for month in self.dirty:
             save_json(self.folder / f"{month}.json", self.months[month])
@@ -500,7 +604,7 @@ def default_state(S):
     return {"version": 1, "rho": {"club": sv["draw_correction"], "intl": sv["draw_correction"]},
             "fav": {"club": 0.0, "intl": 0.0}, "z00": {"club": 0.0, "intl": 0.0}, "btts": {"club": 0.0, "intl": 0.0},
             "form_weight": sv["form_weight"], "half_life": sv["strength_half_life_days"], "league_adj": {},
-            "tuning": {}, "changes": [], "check": [], "replay_back_to": None}
+            "tuning": {}, "changes": [], "replay_back_to": None}
 
 
 class Calibrator:
@@ -516,7 +620,8 @@ class Calibrator:
     def settled(self, group, days=365, limit=4000):
         out = []
         for fid, e in self.log.entries(self.ref_ts - days * 86400, self.ref_ts):
-            if isinstance(e.get("r"), list) and ("intl" if e.get("i") else "club") == group:
+            if isinstance(e.get("r"), list) and e.get("lh") is not None and not e.get("v1") \
+                    and ("intl" if e.get("i") else "club") == group:
                 out.append(e)
         out.sort(key=lambda e: -e["ts"])
         return out[:limit]
@@ -560,23 +665,56 @@ class Calibrator:
                     self.note(f"{who}: {what[0]} {'raised' if more else 'lowered'} slightly "
                               f"({what[1] if more else what[2]}, {len(rows)} games).")
 
-    def model_check(self):
-        lines = []
-        for group, label in (("club", "Clubs"), ("intl", "Internationals")):
-            rows = [e for e in self.settled(group, days=90, limit=10**6) if e.get("p")]
-            if len(rows) < 30:
-                continue
-            n = len(rows)
-            f00 = sum(e["p"]["p00"] for e in rows) / n * 100
-            a00 = sum(1 for e in rows if sum(e["r"]) == 0) / n * 100
-            fd = sum(e["p"]["d"] for e in rows) / n * 100
-            ad = sum(1 for e in rows if e["r"][0] == e["r"][1]) / n * 100
-            fb = sum(e["p"]["btts"] for e in rows) / n * 100
-            ab = sum(1 for e in rows if e["r"][0] > 0 and e["r"][1] > 0) / n * 100
-            lines.append({"label": f"{label}: 0-0s per 100 games", "forecast": round(f00, 1), "actual": round(a00, 1), "n": n})
-            lines.append({"label": f"{label}: draws per 100 games", "forecast": round(fd, 1), "actual": round(ad, 1), "n": n})
-            lines.append({"label": f"{label}: both teams scored, per 100", "forecast": round(fb, 1), "actual": round(ab, 1), "n": n})
-        self.ms["check"] = lines
+
+CHECK_DAYS, CHECK_MIN_GAMES, CHECK_Z = 180, 30, 2.5
+CHECK_METRICS = (("p00", lambda p: p["p00"], lambda r: r[0] + r[1] == 0),
+                 ("draw", lambda p: p["d"], lambda r: r[0] == r[1]),
+                 ("home", lambda p: p["w"], lambda r: r[0] > r[1]),
+                 ("btts", lambda p: p["btts"], lambda r: r[0] > 0 and r[1] > 0))
+
+
+def model_check(plog, ref_ts):
+    """Forecast against actual for every settled game (not just picks), overall and per competition, last 180 days.
+    A figure is flagged for review when the gap is too big to be chance (more than 2.5 standard errors, 30+ games)."""
+    groups = defaultdict(list)
+    for fid, e in plog.entries(ref_ts - CHECK_DAYS * 86400, ref_ts):
+        p = e.get("p") or {}
+        if not isinstance(e.get("r"), list) or e.get("v1") or "d" not in p or "btts" not in p:
+            continue
+        groups[("1", "All internationals" if e.get("i") else "All club games")].append(e)
+        groups[("2", e["cn"])].append(e)
+    rows = []
+    for (order, name), es in sorted(groups.items()):
+        n, m = len(es), {}
+        for key, fp, hit in CHECK_METRICS:
+            ps = [fp(e["p"]) for e in es]
+            f = sum(ps) / n
+            a = sum(1 for e in es if hit(e["r"])) / n
+            se = math.sqrt(sum(x * (1 - x) for x in ps)) / n
+            m[key] = {"f": round(f * 100, 1), "a": round(a * 100, 1),
+                      "off": n >= CHECK_MIN_GAMES and se > 0 and abs(a - f) > CHECK_Z * se}
+        rows.append({"comp": name, "n": n, "overall": order == "1", "m": m, "review": any(v["off"] for v in m.values())})
+    return {"days": CHECK_DAYS, "min_games": CHECK_MIN_GAMES, "rows": rows}
+
+
+def update_intl_pass(ms, plog, S, check, note):
+    """International pass mark: +1 per 50 settled international games (real predictions only), up to the club mark.
+    It never goes down, and pauses while the model check flags internationals for review."""
+    start, end, per = intl_pass_cfg(S)
+    st = ms.setdefault("intl_pass", {"value": start, "games": 0, "paused": False})
+    st["value"] = max(start, min(end, st.get("value", start)))
+    n = sum(1 for _, e in plog.entries() if e.get("i") and not e.get("rp") and not e.get("v1") and isinstance(e.get("r"), list))
+    st["games"] = n
+    target = min(end, start + n // per)
+    flagged = any(r["review"] for r in check["rows"] if r["overall"] and r["comp"] == "All internationals")
+    if target > st["value"] and not flagged:
+        note(f"International pass mark raised {st['value']} → {target} ({n} international games settled).")
+        st["value"] = target
+    elif target > st["value"] and flagged and not st.get("paused"):
+        note("International pass mark rise paused: the model check flags internationals for review.")
+    st["paused"] = bool(flagged and target > st["value"])
+    st["next_at"] = None if st["value"] >= end else (st["value"] - start + 1) * per
+    return st
 
 
 # ----------------------------------------------------------------------------------------------
@@ -978,7 +1116,7 @@ class Build:
                 continue
             for p in self.predict(its, fit):
                 v = self.store.matches[p["fid"]]
-                plog.put(p["fid"], log_entry(p, [v[5], v[6]]), replay=True)
+                plog.put(p["fid"], {**log_entry(p, [v[5], v[6]]), "rp": 1}, replay=True)
                 n += 1
         return n
 
@@ -1077,7 +1215,7 @@ def rank_sections(preds, S):
         for r, p in enumerate(cand):
             s = p["sec"][key]
             s["rank"] = r + 1
-            mn = S["min_score_international"] if p["intl"] else S["min_score"]
+            mn = S.get("_pass_intl", intl_pass_cfg(S)[0]) if p["intl"] else S["min_score"]
             s["pick"] = s["score"] >= mn and n < S["top_n"]
             n += s["pick"]
         for p in preds:
@@ -1093,31 +1231,146 @@ def log_entry(p, result=None):
             "r": result}
 
 
-def record_summary(plog, ref_ts, S):
-    """Section hit rates for the Record screen (real picks only, not replays)."""
-    secs = {k: {"d30": {"won": 0, "lost": 0, "void": 0, "pending": 0}, "all": {"won": 0, "lost": 0, "void": 0, "pending": 0}}
-            for k in SECTIONS}
-    recent = defaultdict(list)
-    for fid, e in plog.entries(ref_ts - S["history_days"] * 86400, ref_ts + 2 * 86400):
+
+
+# ----------------------------------------------------------------------------------------------
+# Outputs for the app: Record (picks by section), All results (archive + Goalscraper's view), model check
+# ----------------------------------------------------------------------------------------------
+BANDS = ((80, 101, "80–100"), (65, 80, "65–79"), (50, 65, "50–64"), (0, 50, "Below 50 (internationals)"))
+
+
+def tally():
+    return {"won": 0, "lost": 0, "void": 0}
+
+
+def record_summary(plog, ref_ts, tz):
+    """Every real pick (not replays), settled or waiting, plus per-section summaries. First-version picks are listed
+    but not counted."""
+    secs = {k: {"d30": tally(), "all": tally(), "pending": 0, "v1": 0, "bands": {}, "comps": {}} for k in SECTIONS}
+    days = defaultdict(list)
+    for fid, e in plog.entries():
         if e.get("rp"):
             continue
-        for k, (score, rank, pick, team) in e["s"].items():
-            if not pick:
+        for k, v in e["s"].items():
+            score, rank, pick, team = (list(v) + [None, None, None, None])[:4]
+            if not pick or k not in secs:
                 continue
             r = e.get("r")
             res = "pending" if r is None else "void" if r == "void" else ("won" if pick_won(k, team, r[0], r[1]) else "lost")
-            secs[k]["all"][res] += 1
+            day = datetime.fromtimestamp(e["ts"], tz).date().isoformat()
+            row = {"t": e["ts"], "h": e["h"], "a": e["a"], "c": e["cn"], "k": k, "tm": team, "s": round(score, 1),
+                   "rk": rank, "r": r if isinstance(r, list) else None, "res": res}
+            if e.get("v1"):
+                row["v1"] = 1
+            days[day].append(row)
+            S = secs[k]
+            if e.get("v1"):
+                S["v1"] += 1
+                continue
+            if res == "pending":
+                S["pending"] += 1
+                continue
+            S["all"][res] += 1
             if e["ts"] >= ref_ts - 30 * 86400:
-                secs[k]["d30"][res] += 1
-            if e["ts"] >= ref_ts - 7 * 86400:
-                day = datetime.fromtimestamp(e["ts"], timezone.utc).date().isoformat()
-                recent[day].append({"ts": e["ts"], "h": e["h"], "a": e["a"], "comp": e["cn"], "section": k, "team": team,
-                                    "score": score, "rank": rank, "result": r, "res": res})
-    days = [{"date": d, "picks": sorted(v, key=lambda x: (x["ts"], x["section"]))} for d, v in sorted(recent.items(), reverse=True)]
-    return {"sections": secs, "recent": days}
+                S["d30"][res] += 1
+            if res == "void":
+                continue
+            band = next(lab for lo, hi, lab in BANDS if lo <= score < hi)
+            S["bands"].setdefault(band, tally())[res] += 1
+            S["comps"].setdefault(e["cn"], tally())[res] += 1
+    for S in secs.values():
+        S["bands"] = [{"label": lab, **S["bands"][lab]} for _, _, lab in BANDS if lab in S["bands"]]
+        S["comps"] = sorted(({"comp": c, **t} for c, t in S["comps"].items()),
+                            key=lambda x: (-(x["won"] + x["lost"]), x["comp"]))
+    order = {k: i for i, k in enumerate(SECTIONS)}
+    return {"sections": secs,
+            "days": [{"date": d, "picks": sorted(v, key=lambda x: (order[x["k"]], x["rk"] or 99, x["t"]))}
+                     for d, v in sorted(days.items(), reverse=True)]}
 
 
-def build_site():
+def build_results(archive, plog, build, store, tz, check, gen):
+    """All results for the app: one file per month (every result in the archive) with Goalscraper's section scores
+    for the games it rated. Written to the published site only; the archive itself is the permanent copy."""
+    logged = {fid: e for fid, e in plog.entries()}
+    files, days = {}, set()
+    for m in archive.months_on_disk() + sorted(set(archive.months) - set(archive.months_on_disk())):
+        if m in files:
+            continue
+        games = []
+        for mid, r in archive.load(m).items():
+            comp, season, ts, hn, an, gh, ga, st = r[:8]
+            e = logged.get(mid)
+            no = build.of_to_no.get(comp)
+            if e:
+                name = e["cn"]
+            elif no:
+                name = build.comp_by_no[no]["name"]
+            else:
+                meta = store.comps.get(comp) or {}
+                name = meta.get("name") or comp
+                if meta.get("country") and norm(meta["country"]) not in norm(name):
+                    name = f"{name} ({meta['country']})"
+            g = {"id": mid, "t": ts, "c": name, "m": 1 if (no or e) else 0, "h": hn, "a": an,
+                 "r": [gh, ga] if st == "finished" and gh is not None and ga is not None else None}
+            if e:
+                g["s"] = {k: [round(v[0], 1), v[1], 1 if v[2] else 0, v[3]] for k, v in e["s"].items()}
+                if e.get("v1"):
+                    g["v1"] = 1
+            games.append(g)
+            days.add(datetime.fromtimestamp(ts, tz).date().isoformat())
+        games.sort(key=lambda g: -g["t"])
+        files[m] = games
+    index = {"generated_utc": gen, "months": sorted(files, reverse=True), "days": sorted(days, reverse=True)[:60],
+             "check": check}
+    return index, files
+
+
+def import_first_version(plog, comp_doc, path):
+    """One-off: the first version kept its Easy Goals picks in data/history.json. Add them to the log, marked as
+    first-version picks (shown on Record, not counted), then remove the old file."""
+    if not path.exists():
+        return 0
+    d = load_json(path, None)
+    if not isinstance(d, dict) or not isinstance(d.get("games"), dict):
+        return 0
+    by_name = {c["name"]: c for c in comp_doc["competitions"]}
+    n = 0
+    for fid, g in d["games"].items():
+        if not g.get("top10") or not g.get("ts"):
+            continue
+        month = plog.load(plog.month_of(g["ts"]))
+        if fid in month and not month[fid].get("rp") and not month[fid].get("v1"):
+            continue                                   # a real prediction already exists
+        c = by_name.get(g.get("comp"))
+        res = g.get("result")
+        month[fid] = {"ts": g["ts"], "c": c["no"] if c else None, "cn": g.get("comp") or "", "h": g.get("home"),
+                      "a": g.get("away"), "i": bool(c and c["pool"].endswith("nat")), "lh": None, "la": None,
+                      "lim": False, "p": {"p00": g.get("p00")}, "s": {"goals": [g.get("score") or 0, g.get("rank"), True, None]},
+                      "r": res if isinstance(res, list) else None, "v1": 1}
+        plog.dirty.add(plog.month_of(g["ts"]))
+        n += 1
+    plog.save()
+    path.unlink()
+    return n
+
+
+def write_outputs(build, store, plog, archive, tz, gen, first_archive):
+    """Archive the latest results, then rebuild Record and All results. Returns the files for the site."""
+    added = archive.update_from(store, 0 if first_archive else build.ref_ts - 30 * 86400)
+    archive.save()
+    if added:
+        print(f"  archive: {added} new results")
+    check = model_check(plog, build.ref_ts)
+    record = record_summary(plog, build.ref_ts, tz)
+    record["generated_utc"] = gen
+    save_json(DATA / "record.json", record)
+    index, months = build_results(archive, plog, build, store, tz, check, gen)
+    files = {"results/index.json": index}
+    files.update({f"results/{m}.json": g for m, g in months.items()})
+    return check, files
+
+
+def build_site(extra=None):
     if SITE.exists():
         shutil.rmtree(SITE)
     shutil.copytree(WEB, SITE)
@@ -1125,6 +1378,8 @@ def build_site():
     for name in ("today.json", "coverage.json", "record.json"):
         if (DATA / name).exists():
             shutil.copy(DATA / name, SITE / "data" / name)
+    for name, obj in (extra or {}).items():
+        save_json(SITE / "data" / name, obj)
 
 
 def gh_output(**kv):
@@ -1135,12 +1390,62 @@ def gh_output(**kv):
                 fh.write(f"{k}={v}\n")
 
 
+def run_evening(api, build, store, plog, archive, tz, state, now_local, first_archive):
+    """Evening update: fetch today's (and tomorrow's) games again, settle finished picks, mark postponed games.
+    The morning's list, scores and rankings are left exactly as they were."""
+    err = None
+    try:
+        if store.comps:
+            build.discover()
+        d0 = build.ref.astimezone(timezone.utc).date()
+        build.sweep([d0.isoformat(), (d0 + timedelta(days=1)).isoformat()])
+    except BudgetExhausted:
+        err = "Request limit reached, so the evening update was skipped."
+    except (PlanBlocked, ApiError) as e:
+        err = f"OpenFootAPI: {e}"[:200]
+    before = sum(1 for _, e in plog.entries() if e.get("r") is not None)
+    plog.settle(store, build.ref_ts)
+    settled = sum(1 for _, e in plog.entries() if e.get("r") is not None) - before
+    gen = datetime.now(timezone.utc).isoformat()
+    today = load_json(DATA / "today.json", None)
+    postponed = finished = 0
+    if today:
+        for g in today.get("games", []):
+            v = store.matches.get(g["fid"])
+            if not v:
+                continue
+            g["status"] = v[7]
+            if v[7] in ("postponed", "cancelled") and "postponed" not in g["tags"]:
+                g["tags"].append("postponed")
+                postponed += 1
+            if v[7] == "finished" and v[5] is not None and v[6] is not None:
+                g["result"] = [v[5], v[6]]
+                finished += 1
+        today["updated_utc"] = gen
+        save_json(DATA / "today.json", today)
+    cov = load_json(DATA / "coverage.json", {})
+    cov["evening"] = {"at": gen, "requests_used": api.used, "monthly_remaining": api.quota_remaining,
+                      "settled": settled, "postponed": postponed, "error": err}
+    save_json(DATA / "coverage.json", cov)
+    plog.save()
+    _, files = write_outputs(build, store, plog, archive, tz, gen, first_archive)
+    state.update({"evening_local_date": now_local.date().isoformat(), "evening_utc": gen})
+    save_json(DATA / "state.json", state)
+    build_site(files)
+    gh_output(ran="true")
+    print(f"Evening update: {finished} of today's games finished, {settled} predictions settled, {postponed} postponed."
+          f" Requests used: {api.used}. Monthly left: {api.quota_remaining}." + (f" Problem: {err}" if err else ""))
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser()
-    ap.add_argument("--force", action="store_true", help="run even if today's run already happened")
+    ap.add_argument("--force", action="store_true", help="full run now (a manual run never cancels the 6:15 run)")
+    ap.add_argument("--evening", action="store_true", help="evening update now: results so far, no new list")
     ap.add_argument("--mock", action="store_true", help="use simulated data (testing)")
     ap.add_argument("--mock-quota", type=int, default=5000, help=argparse.SUPPRESS)
     ap.add_argument("--now", help=argparse.SUPPRESS)   # testing: pretend the run happens at this UTC time
+    ap.add_argument("--scheduled", action="store_true", help=argparse.SUPPRESS)   # testing: act like a scheduled run
     args = ap.parse_args(argv)
 
     settings = load_json(CONFIG / "settings.json", None)
@@ -1151,13 +1456,25 @@ def main(argv=None):
     state = load_json(DATA / "state.json", {})
     ref = datetime.fromisoformat(args.now) if args.now else datetime.now(timezone.utc)
     now_local = ref.astimezone(tz)
+    today_s = now_local.date().isoformat()
 
-    # Scheduled runs: 6:15 Irish time all year. GitHub wakes it at 05:15 and 06:15 UTC; only one proceeds.
-    if os.environ.get("GITHUB_EVENT_NAME") == "schedule" and not args.force:
-        hh, mm = map(int, settings["run_time_local"].split(":"))
-        start = now_local.replace(hour=hh, minute=mm, second=0, microsecond=0) - timedelta(minutes=20)
-        if now_local < start or state.get("last_run_local_date") == now_local.date().isoformat():
-            print(f"Not time yet / already ran today ({now_local:%Y-%m-%d %H:%M} Irish time). Skipping.")
+    # Scheduled runs: GitHub wakes it at 05:15 and 06:15 UTC (the 6:15 run) and at 17:00 and 18:00 UTC (the 18:00
+    # evening update), so one of each pair matches Irish time in summer and winter; the rest skip. If the morning
+    # run didn't happen, the evening one does a full run instead. Manual runs never mark the day as done.
+    scheduled = (os.environ.get("GITHUB_EVENT_NAME") == "schedule" or args.scheduled) and not args.force and not args.evening
+    mode = "evening" if args.evening else "full"
+    if scheduled:
+        def at(hhmm):
+            hh, mm = map(int, hhmm.split(":"))
+            return now_local.replace(hour=hh, minute=mm, second=0, microsecond=0) - timedelta(minutes=20)
+        m_start, e_start = at(settings["run_time_local"]), at(settings.get("evening_time_local", "18:00"))
+        done = state.get("last_run_local_date") == today_s
+        if now_local >= e_start and state.get("evening_local_date") != today_s:
+            mode = "evening" if done else "full"
+        elif m_start <= now_local < e_start and not done:
+            mode = "full"
+        else:
+            print(f"Nothing due at {now_local:%Y-%m-%d %H:%M} Irish time (already ran, or not time yet). Skipping.")
             gh_output(ran="false")
             return 0
 
@@ -1174,14 +1491,26 @@ def main(argv=None):
         api = OpenFoot(key)
 
     R = settings["requests"]
-    print(f"Goalscraper: window starts {now_local:%a %d %b %Y %H:%M} Irish time")
+    print(f"Goalscraper ({'evening update' if mode == 'evening' else 'full run'}): {now_local:%a %d %b %Y %H:%M} Irish time")
     store = Store(DATA / "store.json")
+    archive = Archive(DATA / "archive")
+    first_archive = not archive.months_on_disk()
     ms = load_json(DATA / "model_state.json", None) or default_state(settings)
     for k, v in default_state(settings).items():
         ms.setdefault(k, v)
     build = Build(api, settings, comp_doc, store, ref, ms)
+    if not store.matches and not first_archive:
+        n = archive.rebuild_store(store, build.ref_ts - 500 * 86400, build.ref_ts - 1200 * 86400)
+        print(f"  saved results were missing (GitHub's cache was empty): rebuilt {n} from the archive")
     plog = PredLog(DATA / "log")
-    plog.load_range(build.ref_ts - 400 * 86400, build.end_ts)
+    plog.load_all()
+    if plog.mark_old_replays():
+        plog.save()
+    n1 = import_first_version(plog, comp_doc, DATA / "history.json")
+    if n1:
+        print(f"  added {n1} first-version picks from data/history.json to the record")
+    i_start, i_end, _ = intl_pass_cfg(settings)
+    settings["_pass_intl"] = (ms.get("intl_pass") or {}).get("value", i_start)
 
     days_left = max(1, (date(ref.year + (ref.month == 12), ref.month % 12 + 1, 1) - ref.date()).days)
 
@@ -1191,6 +1520,17 @@ def main(argv=None):
         return min(per_run, remaining - R["keep_in_reserve"])
 
     api.budget_rule = budget_rule
+    nat_ids = {i for no, ids in build.comp_ids.items() if build.comp_by_no[no]["pool"].endswith("nat") for i in ids}
+
+    def save_store():
+        store.save(keep_after_ts=build.ref_ts - 500 * 86400, keep_longer=nat_ids, longer_after_ts=build.ref_ts - 1200 * 86400)
+
+    if mode == "evening":
+        try:
+            return run_evening(api, build, store, plog, archive, tz, state, now_local, first_archive)
+        finally:
+            save_store()
+
     fatal = None
     try:
         build.load_catalogue()
@@ -1201,16 +1541,20 @@ def main(argv=None):
         fatal = f"OpenFootAPI refused the key: {e}"
     except ApiError as e:
         fatal = f"OpenFootAPI error: {e}"
-    nat_ids = {i for no, ids in build.comp_ids.items() if build.comp_by_no[no]["pool"].endswith("nat") for i in ids}
-    store.save(keep_after_ts=build.ref_ts - 500 * 86400, keep_longer=nat_ids, longer_after_ts=build.ref_ts - 1200 * 86400)
+    nat_ids |= {i for no, ids in build.comp_ids.items() if build.comp_by_no[no]["pool"].endswith("nat") for i in ids}
+    save_store()
+    gen = datetime.now(timezone.utc).isoformat()
     if fatal:
         print("FAILED:", fatal)
         cov = load_json(DATA / "coverage.json", {})
-        cov.update({"last_error": fatal, "last_error_at": datetime.now(timezone.utc).isoformat()})
+        cov.update({"last_error": fatal, "last_error_at": gen})
         save_json(DATA / "coverage.json", cov)
+        plog.settle(store, build.ref_ts)
+        plog.save()
+        _, files = write_outputs(build, store, plog, archive, tz, gen, first_archive)
         prev = (DATA / "today.json").exists()
         if prev:
-            build_site()
+            build_site(files)
         gh_output(ran="true" if prev else "false")
         return 1
 
@@ -1240,7 +1584,11 @@ def main(argv=None):
             build.adjust_league_strengths(cal)
         except Exception as e:                    # tuning must never stop the daily list
             print("  tuning skipped:", repr(e))
-    cal.model_check()
+    plog.save()
+    check, files = write_outputs(build, store, plog, archive, tz, gen, first_archive)
+    used_pass = settings["_pass_intl"]
+    ipass = update_intl_pass(ms, plog, settings, check, cal.note)
+    ms.pop("check", None)
     if cal.changes:
         ms["version"] = ms.get("version", 1) + 1
         for c in cal.changes:
@@ -1257,10 +1605,8 @@ def main(argv=None):
         out.append(c)
         last_none = none
     ms["changes"] = out[:40]
-    plog.save()
     save_json(DATA / "model_state.json", ms)
 
-    gen = datetime.now(timezone.utc)
     disc = state.setdefault("discovered", {})
     for no in build.discovered:
         disc.setdefault(str(no), now_local.date().isoformat())
@@ -1273,9 +1619,9 @@ def main(argv=None):
     for p in preds:
         p.pop("raw", None)
     today = {
-        "app": "Goalscraper", "generated_utc": gen.isoformat(), "source": "OpenFootAPI", "plan": api.plan,
+        "app": "Goalscraper", "generated_utc": gen, "source": "OpenFootAPI", "plan": api.plan,
         "window_start_ts": build.ref_ts, "window_end_ts": build.end_ts, "timezone": settings["timezone"],
-        "top_n": settings["top_n"], "min_club": settings["min_score"], "min_intl": settings["min_score_international"],
+        "top_n": settings["top_n"], "min_club": settings["min_score"], "min_intl": used_pass, "min_intl_end": i_end,
         "ballon_min": settings["sections"]["ballon"]["min_favourite"],
         "misses_longest": settings["sections"]["misses"]["longest_price"],
         "goals_max": settings["sections"]["goals"]["max_chance_of_goal"],
@@ -1289,24 +1635,26 @@ def main(argv=None):
                           "prestige": c["prestige"], **cv, "newly_found": c["no"] in recent,
                           "matched": [{"id": i, "name": store.comp_name(i)} for i in ids if i], "matched_count": len(ids)})
     coverage = {
-        "generated_utc": gen.isoformat(), "plan": api.plan, "source": "OpenFootAPI",
+        "generated_utc": gen, "plan": api.plan, "source": "OpenFootAPI", "manual": not scheduled,
         "requests_used": api.used, "requests_available": api.limit, "monthly_remaining": api.quota_remaining,
         "games_scored": len(preds), **stats, "competitions": comps_out, "notes": build.notes[:20], "last_error": None,
-        "model": {"version": ms["version"], "changes": ms["changes"][:15], "check": ms.get("check", []),
+        "archive_months": len(archive.months_on_disk()),
+        "model": {"version": ms["version"], "changes": ms["changes"][:15], "intl_pass": ipass, "intl_pass_end": i_end,
                   "form_weight": ms["form_weight"], "half_life": ms["half_life"]},
     }
-    record = record_summary(plog, build.ref_ts, settings)
-    record["check"] = ms.get("check", [])
-    record["generated_utc"] = gen.isoformat()
     save_json(DATA / "today.json", today)
     save_json(DATA / "coverage.json", coverage)
-    save_json(DATA / "record.json", record)
-    state.update({"last_run_local_date": now_local.date().isoformat(), "last_run_utc": gen.isoformat()})
+    if scheduled:
+        state.update({"last_run_local_date": today_s, "last_run_utc": gen})
+        if mode == "full" and now_local >= now_local.replace(hour=17, minute=0):
+            state["evening_local_date"] = today_s     # a late full run also covers the evening update
+    else:
+        state["last_manual_utc"] = gen
     save_json(DATA / "state.json", state)
-    build_site()
+    build_site(files)
     gh_output(ran="true")
     print(f"Plan: {api.plan}. Scored {len(preds)} games. Requests used: {api.used} (run limit {api.limit}). "
-          f"Monthly left: {api.quota_remaining}.")
+          f"Monthly left: {api.quota_remaining}. International pass mark {ipass['value']} ({ipass['games']} games).")
     for key in SECTIONS:
         picks = sorted([p for p in preds if p["sec"][key]["pick"]], key=lambda p: p["sec"][key]["rank"])
         print(f"  {key:6} {len(picks):2} picks: " + ", ".join(f"{p['home']['name']} v {p['away']['name']} {p['sec'][key]['score']:.0f}"

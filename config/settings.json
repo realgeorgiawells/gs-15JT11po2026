@@ -1,31 +1,41 @@
 {
- "_about": "Main settings for Goalscraper (data from OpenFootAPI's free plan). The model's learned adjustments live in data/model_state.json, not here.",
+ "_about": "Main settings for Goalscraper (data from OpenFootAPI's free plan). The full run is at run_time_local and a short evening update (results so far, postponements) at evening_time_local, Irish time. The model's learned adjustments live in data/model_state.json, not here.",
  "timezone": "Europe/Dublin",
  "run_time_local": "06:15",
+ "evening_time_local": "18:00",
  "window_hours": 24,
  "top_n": 10,
  "min_score": 50,
- "min_score_international": 40,
+ "international_pass_mark": {
+  "_about": "Internationals start with a lower pass mark (national teams play few games, so their scores run lower). It rises 1 point for every 'games_per_point' international games Goalscraper has predicted and settled, up to 'end', and pauses while the model check flags internationals for review.",
+  "start": 40,
+  "end": 50,
+  "games_per_point": 50
+ },
  "sections": {
-  "_about": "Each section's 1-100 scale is set by the chance of the pick going wrong: 'fail_at_100' scores 100, 'fail_at_50' scores 50 (the pass mark). Easy Goals goes wrong on a 0-0; Misses if the team wins; Ballon d'Or if the team doesn't win; Raining Goals if either team fails to score.",
+  "_about": "Each section's 1-100 scale is set by the chance of the pick going wrong: 'fail_at_100' scores 100, 'fail_at_50' scores 50 (the pass mark), 'fail_at_1' scores 1. Easy Goals goes wrong on a 0-0; Misses if the team wins; Ballon d'Or if the team doesn't win; Raining Goals if either team fails to score.",
   "goals": {
    "max_chance_of_goal": 0.97,
    "fail_at_100": 0.03,
-   "fail_at_50": 0.065
+   "fail_at_50": 0.065,
+   "fail_at_1": 0.3
   },
   "misses": {
    "longest_price": 25,
    "fail_at_100": 0.0385,
-   "fail_at_50": 0.25
+   "fail_at_50": 0.25,
+   "fail_at_1": 0.6
   },
   "ballon": {
    "min_favourite": 0.8,
    "fail_at_100": 0.1,
-   "fail_at_50": 0.2
+   "fail_at_50": 0.2,
+   "fail_at_1": 0.45
   },
   "btts": {
    "fail_at_100": 0.28,
-   "fail_at_50": 0.4
+   "fail_at_50": 0.4,
+   "fail_at_1": 0.8
   }
  },
  "starting_values": {
@@ -54,6 +64,5 @@
   "max_per_run": 600,
   "keep_in_reserve": 100,
   "sweep_days_back": 2
- },
- "history_days": 400
+ }
 }

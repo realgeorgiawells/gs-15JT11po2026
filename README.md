@@ -1,44 +1,85 @@
 # Goalscraper
 
-Every morning at 6:15 Irish time, Goalscraper scores each game in the next 24 hours, in your chosen
-competitions, on how unlikely it is to end 0-0 (1.00 to 100.00), and publishes the list as a phone app.
+Every morning at 6:15 Irish time, Goalscraper rates each game in the next 24 hours, in your chosen competitions,
+for four sections, and publishes the picks as a phone app. At about 6 pm a short update brings in the results so
+far and marks postponed games. Every prediction and every result is kept, and the model checks itself against
+them each morning.
 
-**Setting it up:** follow the Goalscraper setup guide from the chat with Claude.
+## The four sections
+
+| Section | A pick goes wrong if… | Rules |
+| --- | --- | --- |
+| Easy Goals | the game ends 0-0 | games over 97% likely to have a goal are too short to be picks |
+| Misses | the team wins | underdogs no longer than 25/1, in games without an 80%+ favourite |
+| Ballon d'Or | the team doesn't win | favourites at 80% or more |
+| Raining Goals | either team fails to score | — |
+
+Each game gets a 1-100 score per section, on that section's own scale (set in `config/settings.json`). A pick needs
+50; up to 10 per section, never padded. Misses and Ballon d'Or never share a game. The Selected tab lists the picks
+from Easy Goals, Misses and Ballon d'Or in kickoff order.
+
+**Internationals** start with a pass mark of 40, because national teams play few games and their scores run lower.
+It rises 1 point for every 50 international games Goalscraper has predicted and settled, up to 50, never goes
+down, and pauses while the model check flags internationals for review.
+
+## The app
+
+- **Selected / Easy Goals / Misses / Ballon d'Or / Raining Goals** (bottom bar): today's picks, with the next best below.
+- **Menu (≡):** All games, Record, Coverage, How it works.
+- **Record:** a tab per section (last 30 days and all time, by score, by competition, every settled pick by day)
+  and **All results**: every stored result, with Goalscraper's scores for the games it rated, and the **model
+  check**: forecast against actual (0-0s, draws, home wins, both scoring) for each competition over 180 days,
+  flagged for review when the gap is too big to be bad luck.
+- **Coverage:** the last run, requests used, the evening update, the international pass mark and every change the
+  model has made to itself.
+
+## How the model works
+
+1. Team strength: attack and defence ratings fitted to results (this season plus last), adjusted for each opponent and
+   league. Cup and European sides are rated from their own league too. National teams use three years of internationals.
+2. Recent form adds a little on top. Win, draw and loss chances use a draw correction.
+3. Every prediction is saved in `data/log/` (one file per month) and settled with the result.
+4. Each morning the model checks itself against those results and nudges, within limits: draw correction, favourite
+   strength, 0-0 and both-score allowances (clubs and internationals separately), form weight, how fast old games fade,
+   and league strengths. What it has learned is in `data/model_state.json`.
 
 ## What's in here
 
 | Path | What it is |
 | --- | --- |
-| `goalscraper.py` | The daily job: fetches data from OpenFootAPI, rates teams, scores games, writes the app |
-| `config/settings.json` | Top-tier size, form weight, request limits per run |
-| `config/competitions.json` | Your 52 competitions, priority values, starting league strengths, OpenFootAPI IDs |
+| `goalscraper.py` | The program: fetches data from OpenFootAPI, rates teams, scores games, writes the app |
+| `config/settings.json` | Pass marks, section scales, run times, request limits |
+| `config/competitions.json` | Your competitions, priority values, starting league strengths, OpenFootAPI IDs |
 | `web/` | The app itself (page, logo, icons, offline support) |
-| `.github/workflows/goalscraper.yml` | Runs the job daily on GitHub and publishes the app |
-| `WORKFLOW-COPY.txt` | A copy of the workflow file, for pasting in if the `.github` folder didn't upload |
+| `.github/workflows/goalscraper.yml` | Runs it on GitHub (6:15 and 18:00 Irish time) and publishes the app |
+| `data/archive/` | **Permanent results archive:** every result OpenFootAPI has returned, one file per month, never deleted |
+| `data/log/` | Every prediction Goalscraper has made, with its result |
+| `data/` (other files) | Today's list, record, coverage report, model state |
 | `tools/` | Logo generator, a simulated OpenFootAPI for testing, and a preview builder |
-| `data/` | Created by the runs: today's list, coverage report, tracking history. `store.json` (saved results) is kept in GitHub's cache, not the repo |
 
-## How a game is scored
-
-1. Team strength: attack and defence ratings fitted to this season's results (plus last season when a
-   team has few games), adjusted for the strength of each opponent and each team's league.
-   Teams in cups and European competitions are rated from their own league's results too.
-2. Recent form nudges those ratings slightly (15% by default).
-3. P(0-0) comes from the expected goals; the score maps P(0-0) of 1% or less to 100 and 30% or more to 1.
-   Teams with little data are tagged and trimmed slightly. (OpenFootAPI's free plan has no odds.)
+`data/store.json` (the working copy of recent results) lives in GitHub's cache, not the repository. If GitHub ever
+clears it, the next run rebuilds it from `data/archive/` without extra requests.
 
 ## Requests
 
-OpenFootAPI's free plan allows 5,000 requests a month, 50 results per request. Each run fetches the last
-couple of days for all competitions in a few requests, and the full season for a competition only the first
-time it has games. A normal day uses about 10-20 requests; each run is capped so the month's quota is spread out.
+OpenFootAPI's free plan allows 5,000 requests a month, 50 results per request. The morning run fetches the last
+couple of days for all competitions in a few requests, and a competition's full season only the first time it has
+games: usually 10-20 requests. The evening update uses about 3-5. Each run is capped so the month's quota is spread
+out, with 100 always kept in reserve.
 
-## Running it yourself
+## Running it by hand
+
+On GitHub: **Actions → Goalscraper daily → Run workflow**, then pick **full** (a new list now) or **evening**
+(results so far). A manual run never stops the 6:15 run.
+
+On a computer:
 
 ```
 export OPENFOOT_API_KEY=your_key
-python goalscraper.py           # normal run
-python goalscraper.py --mock    # simulated data, no key needed
+python goalscraper.py             # full run
+python goalscraper.py --evening   # evening update
+python goalscraper.py --mock      # simulated data, no key needed
 ```
-Needs Python 3.9 or newer and nothing else. The output goes to `site/` (open `site/index.html` through a
-local web server, e.g. `python -m http.server -d site`).
+
+Needs Python 3.9 or newer and nothing else. The output goes to `site/` (open it through a local web server,
+e.g. `python -m http.server -d site`).

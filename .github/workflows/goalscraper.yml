@@ -1,13 +1,22 @@
 name: Goalscraper daily
 
-# Runs at 6:15 am Irish time every day, all year round.
-# GitHub's clock is UTC, so it is woken at both 05:15 and 06:15 UTC and only the one that
-# matches 6:15 in Ireland (summer or winter time) does any work. GitHub can start a few minutes late.
+# The full run is at 6:15 am Irish time and a short evening update at 6 pm, every day, all year round.
+# GitHub's clock is UTC, so each is woken twice (05:15 and 06:15 UTC, 17:00 and 18:00 UTC) and only the one that
+# matches Irish time (summer or winter) does any work; the others skip in a few seconds. GitHub can start late.
+# Run it by hand from the Actions tab: "full" makes a new list now, "evening" just fetches results so far.
 on:
   schedule:
     - cron: "15 5 * * *"
     - cron: "15 6 * * *"
+    - cron: "0 17 * * *"
+    - cron: "0 18 * * *"
   workflow_dispatch:
+    inputs:
+      mode:
+        description: "full = new list now, evening = results so far only"
+        type: choice
+        options: [full, evening]
+        default: full
 
 permissions:
   contents: write
@@ -25,29 +34,31 @@ jobs:
     outputs:
       ran: ${{ steps.build.outputs.ran }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      # Results saved by earlier runs, so only the last few days are fetched
+      # Results saved by earlier runs, so only the last few days are fetched.
+      # If this is ever empty, the program rebuilds it from data/archive.
       - name: Restore saved results
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: data/store.json
           key: results-${{ github.run_id }}
           restore-keys: results-
 
-      - name: Build today's list
+      - name: Run Goalscraper
         id: build
         env:
           OPENFOOT_API_KEY: ${{ secrets.OPENFOOT_API_KEY }}
-        run: python goalscraper.py ${{ github.event_name == 'workflow_dispatch' && '--force' || '' }}
+          MODE_ARG: ${{ github.event_name == 'workflow_dispatch' && (inputs.mode == 'evening' && '--evening' || '--force') || '' }}
+        run: python goalscraper.py $MODE_ARG
 
-      - name: Save results for tomorrow
+      - name: Save results for next time
         if: always() && hashFiles('data/store.json') != ''
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         with:
           path: data/store.json
           key: results-${{ github.run_id }}
@@ -57,16 +68,16 @@ jobs:
         run: |
           git config user.name "goalscraper-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data 
+          git add -A data
           if ! git diff --cached --quiet; then
-            git commit -m "Daily update $(date -u +%Y-%m-%d)"
+            git commit -m "Update $(date -u +'%Y-%m-%d %H:%M')"
             git pull --rebase --autostash || true
             git push
           fi
 
       - name: Package the app
         if: always() && steps.build.outputs.ran == 'true'
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v5
         with:
           path: site
 
@@ -78,6 +89,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - id: deploy
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5

@@ -4,7 +4,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent.parent
 site = ROOT / "site"
 html = (site / "index.html").read_text()
-data = {k: json.loads((site / "data" / f"{k}.json").read_text()) for k in ("today", "coverage", "history")}
+data = {k: json.loads((site / "data" / f"{k}.json").read_text()) for k in ("today", "coverage", "record")}
+for f in sorted((site / "data" / "results").glob("*.json")):
+    data[f"results/{f.stem}"] = json.loads(f.read_text())
 logo = "data:image/svg+xml;base64," + base64.b64encode((site / "logo.svg").read_bytes()).decode()
 html = html.replace('src="logo.svg"', f'src="{logo}"')
 html = html.replace("<script>\n(function(){", "<script>window.__GS__=" + json.dumps(data) + ";</script>\n<script>\n(function(){", 1)

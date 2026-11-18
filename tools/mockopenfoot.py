@@ -59,7 +59,9 @@ class MockOpenFoot:
 
         leagues = [(c["openfoot_id"], c["strength"], c["name"]) for c in comps
                    if c.get("openfoot_id") and c["kind"] == "league"]
-        leagues += [("comp_superliga_dnk", 62, "Danish Superliga"), ("comp_serie_b_it", 70, "Serie B")]
+        for extra in [("comp_superliga_dnk", 62, "Danish Superliga"), ("comp_serie_b_it", 70, "Serie B")]:
+            if extra[0] not in {x[0] for x in leagues}:
+                leagues.append(extra)
         for c in comps:
             if c.get("openfoot_id"):
                 self.comps[c["openfoot_id"]] = {"id": c["openfoot_id"], "name": c["name"].split(" (")[0],
@@ -83,7 +85,7 @@ class MockOpenFoot:
             for i in range(n):
                 tid += 1
                 t = {"id": f"team_{tid}", "name": f"{country[:3]} {NAMES[i % 16]}", "country": country,
-                     "competitionId": cid, "_a": base + rnd.gauss(0, 0.14), "_d": base + rnd.gauss(0, 0.14)}
+                     "competitionId": cid, "_a": base + rnd.gauss(0, 0.26), "_d": base + rnd.gauss(0, 0.26)}
                 self.teams[t["id"]] = t
                 ids.append(t["id"])
             self.by_league[cid] = ids
@@ -115,6 +117,11 @@ class MockOpenFoot:
             nats.append(t["id"])
         self._cup("comp_uefa_nations_league", label("comp_uefa_nations_league"), nats,
                   anchor - timedelta(days=60), 15, "League A - {}", rnd)
+        # earlier internationals: last Nations League season and the 2026 World Cup
+        self._cup("comp_uefa_nations_league", label("comp_uefa_nations_league", 1), nats,
+                  anchor - timedelta(days=420), 15, "League A - {}", rnd)
+        self._cup("comp_fifa_world_cup", "2026", nats, datetime(2026, 6, 12, 18, tzinfo=timezone.utc), 4,
+                  "Group Stage - {}", rnd)
 
         window = sorted((m for m in self.matches if self.now_ts < m["_ts"] < self.now_ts + 86400), key=lambda m: m["_ts"])
         if len(window) > 2:
