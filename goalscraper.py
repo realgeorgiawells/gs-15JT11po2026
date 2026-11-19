@@ -278,12 +278,12 @@ class Store:
 class SportsDB:
     BASE = "https://www.thesportsdb.com/api/v1/json/{key}/"
 
-    def __init__(self, key="123", gap=2.2):
+    def __init__(self, key="123", gap=3.0):
         self.key, self.gap = key, gap
         self.used, self.last, self.errors = 0, 0.0, []
 
     def get(self, path):
-        for attempt in range(4):
+        for attempt in range(6):
             wait = self.gap - (time.time() - self.last)
             if wait > 0:
                 time.sleep(wait)
@@ -295,7 +295,7 @@ class SportsDB:
                     return json.load(r)
             except urllib.error.HTTPError as e:
                 if e.code == 429:              # free key: about 30 a minute
-                    time.sleep(20)
+                    time.sleep(30)
                     continue
                 self.errors.append(f"TheSportsDB {path.split('?')[0]}: HTTP {e.code}")
                 return None
@@ -1679,7 +1679,7 @@ def main(argv=None):
             from mockopenfoot import MockSportsDB
             build.tsdb = MockSportsDB(api)
         else:
-            build.tsdb = SportsDB(os.environ.get("THESPORTSDB_KEY") or tcfg.get("key", "123"), tcfg.get("seconds_between_requests", 2.2))
+            build.tsdb = SportsDB(os.environ.get("THESPORTSDB_KEY") or tcfg.get("key", "123"), tcfg.get("seconds_between_requests", 3.0))
         build.tsdb_aliases = load_json(CONFIG / "team_aliases.json", {})
     if not store.matches and not first_archive:
         n = archive.rebuild_store(store, build.ref_ts - 500 * 86400, build.ref_ts - 1200 * 86400)

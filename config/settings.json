@@ -70,6 +70,6 @@
   "_about": "Free source of upcoming games for competitions where OpenFootAPI only has results (tsdb_id in competitions.json). Key 123 is TheSportsDB's free key; it allows about 30 requests a minute.",
   "enabled": true,
   "key": "123",
-  "seconds_between_requests": 2.2
+  "seconds_between_requests": 3.0
  }
 }
