@@ -65,7 +65,12 @@ clears it, the next run rebuilds it from `data/archive/` without extra requests.
 OpenFootAPI's free plan allows 5,000 requests a month, 50 results per request. The morning run fetches the last
 couple of days for all competitions in a few requests, and a competition's full season only the first time it has
 games: usually 10-20 requests. The evening update uses about 3-5. Each run is capped so the month's quota is spread
-out, with 100 always kept in reserve.
+out, with 100 always kept in reserve. Every Monday the morning run also looks back 14 days for results OpenFootAPI added
+late (about 30 requests).
+
+**Results only:** some competitions on OpenFootAPI only get results after the games are played, never the games
+beforehand, so Goalscraper can't score them. Coverage labels them "Results only"; the label goes by itself if
+OpenFootAPI starts listing their games in advance. Their results still feed the team ratings and the archive.
 
 ## Running it by hand
 

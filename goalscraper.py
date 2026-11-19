@@ -221,13 +221,16 @@ class Store:
         self.backfilled = d.get("backfilled", {})
         self.last_sweep = d.get("last_sweep")
         self.seasons = d.get("seasons", {})      # comp -> latest season label seen
+        self.upcoming = d.get("upcoming", {})    # comp -> last date OpenFootAPI listed a game before it was played
+        self.upcoming_since = d.get("upcoming_since")   # when that tracking started
 
     def save(self, keep_after_ts, keep_longer=(), longer_after_ts=None):
         """Drop old results; international competitions are kept longer (national teams play rarely)."""
         self.matches = {k: v for k, v in self.matches.items()
                         if v[2] >= keep_after_ts or (v[0] in keep_longer and v[2] >= (longer_after_ts or keep_after_ts))}
         save_json(self.path, {"matches": self.matches, "teams": self.teams, "comps": self.comps,
-                              "backfilled": self.backfilled, "last_sweep": self.last_sweep, "seasons": self.seasons})
+                              "backfilled": self.backfilled, "last_sweep": self.last_sweep, "seasons": self.seasons,
+                              "upcoming": self.upcoming, "upcoming_since": self.upcoming_since})
 
     def add(self, m):
         """m: an OpenFootAPI match object."""
@@ -250,6 +253,8 @@ class Store:
         rec = [comp, season, to_ts(m["kickoffAt"]), hid, aid, sc.get("home"), sc.get("away"), status,
                m.get("round") or "", bool(m.get("kickoffTimeKnown", True))]
         self.matches[mid] = rec
+        if comp and status in ("scheduled", "unknown", "") and rec[2] > time.time():
+            self.upcoming[comp] = datetime.now(timezone.utc).date().isoformat()
         if season and comp:
             old = self.seasons.get(comp, "")
             if not old or season[:4] > old[:4] or (season[:4] == old[:4] and len(season) > len(old)):
@@ -312,7 +317,8 @@ class Archive:
             merged = {**old, **new}
             if merged != old:
                 save_json(self.folder / name, merged)
-        meta = {"backfilled": store.backfilled, "seasons": store.seasons, "last_sweep": store.last_sweep}
+        meta = {"backfilled": store.backfilled, "seasons": store.seasons, "last_sweep": store.last_sweep,
+                "upcoming": store.upcoming, "upcoming_since": store.upcoming_since}
         if load_json(self.folder / "meta.json", {}) != meta:
             save_json(self.folder / "meta.json", meta)
         return added
@@ -339,6 +345,15 @@ class Archive:
         store.seasons = meta.get("seasons", {})
         store.last_sweep = meta.get("last_sweep")
         return n
+
+    def merge_upcoming(self, store):
+        """Keep the 'listed before it was played' record even if the cache is lost (it is kept in meta.json too)."""
+        meta = load_json(self.folder / "meta.json", {})
+        for k, v in (meta.get("upcoming") or {}).items():
+            if v > store.upcoming.get(k, ""):
+                store.upcoming[k] = v
+        since = [x for x in (store.upcoming_since, meta.get("upcoming_since")) if x]
+        store.upcoming_since = min(since) if since else datetime.now(timezone.utc).date().isoformat()
 
 
 # ----------------------------------------------------------------------------------------------
@@ -729,6 +744,7 @@ class Build:
         self.comp_ids = {c["no"]: [c["openfoot_id"]] for c in self.comps if c.get("openfoot_id")}
         self.of_to_no = {i: no for no, ids in self.comp_ids.items() for i in ids}
         self.discovered = {}        # no -> [ids] found later in OpenFootAPI's catalogue
+        self.catchup_days = 0       # weekly catch-up: look this many days back for results added late
         self.other = comp_doc["other_league_strength"]
         self.confed = comp_doc["confederation_strength"]
         self.nat_table_src = comp_doc.get("national_team_strength")
@@ -854,7 +870,7 @@ class Build:
         # 1) recent dates (results + the window's fixtures)
         today = self.ref.astimezone(timezone.utc).date()
         end_day = datetime.fromtimestamp(self.end_ts, timezone.utc).date()
-        first = today - timedelta(days=R["sweep_days_back"])
+        first = today - timedelta(days=max(R["sweep_days_back"], self.catchup_days))
         if self.store.last_sweep:
             last = date.fromisoformat(self.store.last_sweep)
             if (today - last).days > 10:
@@ -1502,6 +1518,7 @@ def main(argv=None):
     if not store.matches and not first_archive:
         n = archive.rebuild_store(store, build.ref_ts - 500 * 86400, build.ref_ts - 1200 * 86400)
         print(f"  saved results were missing (GitHub's cache was empty): rebuilt {n} from the archive")
+    archive.merge_upcoming(store)
     plog = PredLog(DATA / "log")
     plog.load_all()
     if plog.mark_old_replays():
@@ -1530,6 +1547,14 @@ def main(argv=None):
             return run_evening(api, build, store, plog, archive, tz, state, now_local, first_archive)
         finally:
             save_store()
+
+    # weekly catch-up: on Mondays (or if a week has gone by) look back 14 days for results OpenFootAPI added late
+    last_cu = state.get("catchup_local_date")
+    since_cu = (now_local.date() - date.fromisoformat(last_cu)).days if last_cu else None
+    catchup = since_cu is None or (since_cu >= 1 and (now_local.weekday() == 0 or since_cu >= 8))
+    if catchup:
+        build.catchup_days = R.get("catchup_days_back", 14)
+        print(f"  weekly catch-up: re-checking the last {build.catchup_days} days for late results")
 
     fatal = None
     try:
@@ -1627,10 +1652,26 @@ def main(argv=None):
         "goals_max": settings["sections"]["goals"]["max_chance_of_goal"],
         "games": sorted(preds, key=lambda p: p["ts"]), "new_competitions": new_names,
     }
+    # Results only: OpenFootAPI sent 3+ results in the last 21 days but listed none of the games beforehand.
+    # Needs 14 days of watching first. Clears itself as soon as a game is listed in advance.
+    watched = (now_local.date() - date.fromisoformat(store.upcoming_since)).days if store.upcoming_since else 0
+    recent_cut = build.ref_ts - 21 * 86400
+    upcoming_cut = (now_local.date() - timedelta(days=21)).isoformat()
+    live_comps = {e.get("c") for _, e in plog.entries(recent_cut, build.ref_ts + 2 * 86400) if not e.get("rp") and not e.get("v1")}
+
+    def results_only(no, ids):
+        if watched < 14 or no in live_comps or not ids:
+            return False
+        if any(store.upcoming.get(i, "") >= upcoming_cut for i in ids):
+            return False
+        return sum(1 for v in store.matches.values() if v[0] in ids and v[7] == "finished" and v[2] >= recent_cut) >= 3
+
     comps_out = []
     for c in sorted(comp_doc["competitions"], key=lambda c: (-c["value"], c["prestige"], c["no"])):
-        cv = build.cov.get(c["no"], {"status": "no_games", "games": 0, "note": ""})
+        cv = dict(build.cov.get(c["no"], {"status": "no_games", "games": 0, "note": ""}))
         ids = build.comp_ids.get(c["no"]) or [i for n in c.get("virtual_of", []) for i in build.comp_ids.get(n, [])]
+        if cv["status"] == "no_games" and not c.get("virtual_of") and results_only(c["no"], build.comp_ids.get(c["no"])):
+            cv.update(status="results_only", note="OpenFootAPI only sends results here, never upcoming games, so they can't be scored")
         comps_out.append({"no": c["no"], "name": c["name"], "group": c["group"], "value": c["value"],
                           "prestige": c["prestige"], **cv, "newly_found": c["no"] in recent,
                           "matched": [{"id": i, "name": store.comp_name(i)} for i in ids if i], "matched_count": len(ids)})
@@ -1638,12 +1679,15 @@ def main(argv=None):
         "generated_utc": gen, "plan": api.plan, "source": "OpenFootAPI", "manual": not scheduled,
         "requests_used": api.used, "requests_available": api.limit, "monthly_remaining": api.quota_remaining,
         "games_scored": len(preds), **stats, "competitions": comps_out, "notes": build.notes[:20], "last_error": None,
-        "archive_months": len(archive.months_on_disk()),
+        "archive_months": len(archive.months_on_disk()), "catchup_last": today_s if catchup else state.get("catchup_local_date"),
+        "results_only_watch_days": watched,
         "model": {"version": ms["version"], "changes": ms["changes"][:15], "intl_pass": ipass, "intl_pass_end": i_end,
                   "form_weight": ms["form_weight"], "half_life": ms["half_life"]},
     }
     save_json(DATA / "today.json", today)
     save_json(DATA / "coverage.json", coverage)
+    if catchup:
+        state["catchup_local_date"] = today_s
     if scheduled:
         state.update({"last_run_local_date": today_s, "last_run_utc": gen})
         if mode == "full" and now_local >= now_local.replace(hour=17, minute=0):

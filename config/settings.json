@@ -63,6 +63,7 @@
   "_about": "OpenFootAPI free plan: 5,000 requests a month. A normal day uses about 10-20; the first run uses more to collect the season so far.",
   "max_per_run": 600,
   "keep_in_reserve": 100,
-  "sweep_days_back": 2
+  "sweep_days_back": 2,
+  "catchup_days_back": 14
  }
 }
