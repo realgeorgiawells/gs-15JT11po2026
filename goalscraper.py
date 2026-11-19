@@ -1652,15 +1652,18 @@ def main(argv=None):
         "goals_max": settings["sections"]["goals"]["max_chance_of_goal"],
         "games": sorted(preds, key=lambda p: p["ts"]), "new_competitions": new_names,
     }
-    # Results only: OpenFootAPI sent 3+ results in the last 21 days but listed none of the games beforehand.
-    # Needs 14 days of watching first. Clears itself as soon as a game is listed in advance.
+    # Results only: 3+ results in the last 21 days, all from games played since Goalscraper started watching, and
+    # none of them listed beforehand (every run looks at today and tomorrow, so a listed game is always seen first).
+    # Clears itself as soon as a game is listed in advance.
+    since_ts = int(datetime.fromisoformat(store.upcoming_since + "T00:00:00+00:00").timestamp()) if store.upcoming_since else build.ref_ts
     watched = (now_local.date() - date.fromisoformat(store.upcoming_since)).days if store.upcoming_since else 0
-    recent_cut = build.ref_ts - 21 * 86400
+    recent_cut = max(build.ref_ts - 21 * 86400, since_ts)
     upcoming_cut = (now_local.date() - timedelta(days=21)).isoformat()
-    live_comps = {e.get("c") for _, e in plog.entries(recent_cut, build.ref_ts + 2 * 86400) if not e.get("rp") and not e.get("v1")}
+    live_comps = {e.get("c") for _, e in plog.entries(build.ref_ts - 21 * 86400, build.ref_ts + 2 * 86400)
+                  if not e.get("rp") and not e.get("v1")}
 
     def results_only(no, ids):
-        if watched < 14 or no in live_comps or not ids:
+        if no in live_comps or not ids:
             return False
         if any(store.upcoming.get(i, "") >= upcoming_cut for i in ids):
             return False
