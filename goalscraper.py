@@ -1406,7 +1406,7 @@ def gh_output(**kv):
                 fh.write(f"{k}={v}\n")
 
 
-def run_evening(api, build, store, plog, archive, tz, state, now_local, first_archive):
+def run_evening(api, build, store, plog, archive, tz, state, now_local, first_archive, scheduled=True):
     """Evening update: fetch today's (and tomorrow's) games again, settle finished picks, mark postponed games.
     The morning's list, scores and rankings are left exactly as they were."""
     err = None
@@ -1445,7 +1445,8 @@ def run_evening(api, build, store, plog, archive, tz, state, now_local, first_ar
     save_json(DATA / "coverage.json", cov)
     plog.save()
     _, files = write_outputs(build, store, plog, archive, tz, gen, first_archive)
-    state.update({"evening_local_date": now_local.date().isoformat(), "evening_utc": gen})
+    if scheduled:                      # a manual evening update never cancels the 6 pm one
+        state.update({"evening_local_date": now_local.date().isoformat(), "evening_utc": gen})
     save_json(DATA / "state.json", state)
     build_site(files)
     gh_output(ran="true")
@@ -1544,7 +1545,7 @@ def main(argv=None):
 
     if mode == "evening":
         try:
-            return run_evening(api, build, store, plog, archive, tz, state, now_local, first_archive)
+            return run_evening(api, build, store, plog, archive, tz, state, now_local, first_archive, scheduled)
         finally:
             save_store()
 
