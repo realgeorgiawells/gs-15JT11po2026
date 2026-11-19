@@ -69,8 +69,12 @@ out, with 100 always kept in reserve. Every Monday the morning run also looks ba
 late (about 30 requests).
 
 **Results only:** some competitions on OpenFootAPI only get results after the games are played, never the games
-beforehand, so Goalscraper can't score them. Coverage labels them "Results only"; the label goes by itself if
-OpenFootAPI starts listing their games in advance. Their results still feed the team ratings and the archive.
+beforehand. For those with a `tsdb_id` in `config/competitions.json` (Scotland, Portugal, Turkey, Belgium, Greece,
+Brazil, Argentina, Denmark, Austria, Mexico, Poland, Serie B, Segunda, Ligue 2, Ecuador, MLS, J-League, Norway and
+more), the upcoming games come from TheSportsDB's free API (about 40 requests a day, no key needed) and both teams are
+matched strictly to OpenFootAPI's names. A game that can't be matched is skipped and listed under Notes on Coverage;
+add the pair to `config/team_aliases.json` to fix it. Their picks settle when OpenFootAPI adds the results (up to 14
+days). Any other results-only competition is labelled "Results only" on Coverage.
 
 ## Running it by hand
 

@@ -198,6 +198,7 @@ class MockOpenFoot:
                 items = [m for m in items if m["season"] == params["season"]]
             if "status" in params:
                 items = [m for m in items if m["status"] == params["status"]]
+            items = [m for m in items if not (m["competitionId"] == "comp_superliga_dnk" and m["status"] != "finished")]
             items = sorted(items, key=lambda m: m["_ts"])
             items = [self._out(m) for m in items]
         else:
@@ -215,3 +216,28 @@ class MockOpenFoot:
                                        "pagination": {"limit": 50, "next_cursor": nxt},
                                        "access": {"plan": "starter", "quota": 5000, "used": 5000 - self.quota_remaining,
                                                   "remaining": self.quota_remaining}}}
+
+
+class MockSportsDB:
+    """Simulated TheSportsDB for testing: lists the mock Danish Superliga's games (which the mock OpenFootAPI also
+    lists) under slightly different team names, plus one game with a team it can't match."""
+    LEAGUE = 4340
+
+    def __init__(self, api):
+        self.api, self.used, self.errors = api, 0, []
+
+    def day(self, league_id, d):
+        self.used += 1
+        if league_id != self.LEAGUE:
+            return []
+        out = []
+        for m in self.api.matches:
+            if m["competitionId"] == "comp_superliga_dnk" and m["kickoffAt"][:10] == d and m["status"] == "scheduled":
+                h, a = self.api.teams[m["_h"]]["name"], self.api.teams[m["_aw"]]["name"]
+                out.append({"idEvent": "mk" + m["id"][-12:], "strHomeTeam": "FC " + h, "strAwayTeam": a + " BK",
+                            "strTimestamp": m["kickoffAt"].replace("Z", ""), "strLeague": "Danish Superliga",
+                            "strStatus": "Not Started", "intRound": "5"})
+        if out:
+            out.append({"idEvent": "mkx", "strHomeTeam": "Nowhere Rovers", "strAwayTeam": a, "strLeague": "Danish Superliga",
+                        "strTimestamp": out[0]["strTimestamp"], "strStatus": "Not Started"})
+        return out

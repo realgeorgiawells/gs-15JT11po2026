@@ -541,6 +541,7 @@ function coverageView(){
     ${COV.evening ? `<div class="kv"><span>Evening update</span><b>${esc(new Date(COV.evening.at).toLocaleString("en-IE", {timeZone: TZ, dateStyle: "medium", timeStyle: "short"}))} · ${COV.evening.requests_used} requests</b></div>` : ""}
     ${COV.evening && COV.evening.error ? `<div class="kv"><span>Evening problem</span><b style="color:var(--red)">${esc(COV.evening.error)}</b></div>` : ""}
     ${COV.model && COV.model.intl_pass ? `<div class="kv"><span>International pass mark</span><b>${COV.model.intl_pass.value}${COV.model.intl_pass.value < COV.model.intl_pass_end ? ` · ${COV.model.intl_pass.paused ? "rise paused (model check)" : `next point at ${COV.model.intl_pass.next_at} games`} (${COV.model.intl_pass.games} so far)` : ""}</b></div>` : ""}
+    ${COV.thesportsdb && COV.thesportsdb.requests ? `<div class="kv"><span>Games from TheSportsDB</span><b>${COV.thesportsdb.games} added${COV.thesportsdb.skipped ? ` · ${COV.thesportsdb.skipped} skipped` : ""}</b></div>` : ""}
     ${COV.catchup_last ? `<div class="kv"><span>Weekly catch-up for late results</span><b>${esc(new Date(COV.catchup_last + "T12:00:00Z").toLocaleDateString("en-IE", {timeZone: "UTC", day: "numeric", month: "short"}))}</b></div>` : ""}
     ${COV.archive_months ? `<div class="kv"><span>Results archive</span><b>${COV.archive_months} month${COV.archive_months === 1 ? "" : "s"}</b></div>` : ""}
     <div class="kv"><span>Dropped: postponed / already started</span><b>${COV.dropped_postponed ?? 0} / ${COV.dropped_started ?? 0}</b></div>
@@ -549,6 +550,10 @@ function coverageView(){
   if ((md.changes || []).length) {
     h += `<div class="sh"><h2 style="font-size:12px">Model adjustments</h2><p>What the daily analysis changed. Recent form counts ${Math.round((md.form_weight || 0) * 100)}%; older games fade with a ${md.half_life} day half-life.</p></div>
       <div class="panel">${md.changes.map(c => `<div class="log">${esc(c.text)}<small>${esc(c.date)}</small></div>`).join("")}</div>`;
+  }
+  if ((COV.notes || []).length) {
+    h += `<div class="sh"><h2 style="font-size:12px">Notes</h2><p>Games skipped because a team name couldn't be matched, and other problems from this run.</p></div>
+      <div class="panel">${COV.notes.map(n => `<div class="log">${esc(n)}</div>`).join("")}</div>`;
   }
   h += `<div class="sh"><h2 style="font-size:12px">Competitions</h2></div>
     <div class="subtabs"><button data-cv="all" class="${covProblems ? "" : "on"}">All ${comps.length}</button><button data-cv="prob" class="${covProblems ? "on" : ""}">Problems only</button></div><div class="panel">`;
@@ -572,7 +577,7 @@ function howView(){
     <h3>Team strength</h3>Attack and defence ratings come from every result, adjusted for the opponent and the league, and update every morning. Recent form counts a little extra. National teams use three years of internationals.
     <h3>Learning from results</h3>Every prediction is stored and checked against what happened. Each morning, settings are nudged where the evidence shows the forecasts are off, separately for clubs and internationals. Changes are listed on the Coverage screen.
     <h3>Updates</h3>The list is made once, at 6:15 each morning, and covers the next 24 hours. At about 6 pm a short update marks postponed games and adds the results so far; it never changes picks or scores.
-    <h3>Results only</h3>Some competitions on OpenFootAPI only get results after the games are played, never the games beforehand, so they can't be scored. Coverage labels them "Results only" (after two weeks of watching), and the label goes as soon as OpenFootAPI lists their games in advance. Their results still feed the team ratings. Every Monday, Goalscraper also looks back 14 days for results that were added late.
+    <h3>Results only</h3>Some competitions on OpenFootAPI only get results after the games are played, never the games beforehand. For most of them (Scotland, Portugal, Brazil, MLS and others) Goalscraper takes the upcoming games from TheSportsDB instead, matching both teams strictly; a game it can't match is skipped and listed under Notes on Coverage. Their picks settle when OpenFootAPI adds the results, which can take a few days. Any others can't be scored. Coverage labels them "Results only" (after two weeks of watching), and the label goes as soon as OpenFootAPI lists their games in advance. Their results still feed the team ratings. Every Monday, Goalscraper also looks back 14 days for results that were added late.
     <h3>International pass mark</h3>Internationals start with a lower pass mark because national teams play few games, which keeps their scores lower. It rises 1 point for every 50 international games Goalscraper has predicted and settled, up to the club mark, and pauses while the model check flags internationals.
     <h3>Record</h3>Each section's tab shows its hit rate over the last 30 days and all time, how each score band and competition has done, and every settled pick by day. All results holds every result stored, with Goalscraper's scores for the games it rated, and the model check: forecast against actual for each competition, flagged when the gap is too big to be bad luck.
     <h3>All games</h3>Each game shows its score in every section: EG = Easy Goals, BD = Ballon d'Or, MI = Misses, RG = Raining Goals.

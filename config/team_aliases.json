@@ -1,0 +1,24 @@
+{
+ "_about": "TheSportsDB name -> OpenFootAPI name, for teams the automatic matching can't pair. Keyed by competition number ('all' for any). Add a line here when Coverage lists a game as skipped.",
+ "all": {},
+ "15": {
+  "Union Saint-Gilloise": "St. Gilloise"
+ },
+ "17": {
+  "İstanbul Başakşehir": "Buyuksehyr"
+ },
+ "24": {
+  "Mito HollyHock": "Mito"
+ },
+ "64": {
+  "Athletico Paranaense": "Athletico-PR",
+  "Flamengo": "Flamengo RJ",
+  "Atlético Mineiro": "Atletico-MG"
+ },
+ "65": {
+  "Gimnasia y Esgrima de La Plata": "Gimnasia L.P."
+ },
+ "66": {
+  "Pumas UNAM": "U.N.A.M.- Pumas"
+ }
+}

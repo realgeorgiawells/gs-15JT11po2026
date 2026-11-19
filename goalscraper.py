@@ -25,6 +25,9 @@ import sys
 import time
 import unicodedata
 import urllib.error
+import urllib.request
+from difflib import SequenceMatcher
+import urllib.error
 import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
@@ -267,6 +270,88 @@ class Store:
     def is_cup(self, cid):
         n = norm(self.comp_name(cid)) + " " + norm(cid.replace("_", " "))
         return any(w in n for w in CUP_WORDS)
+
+
+# ----------------------------------------------------------------------------------------------
+# TheSportsDB (free key): upcoming games for competitions where OpenFootAPI only has results
+# ----------------------------------------------------------------------------------------------
+class SportsDB:
+    BASE = "https://www.thesportsdb.com/api/v1/json/{key}/"
+
+    def __init__(self, key="123", gap=2.2):
+        self.key, self.gap = key, gap
+        self.used, self.last, self.errors = 0, 0.0, []
+
+    def get(self, path):
+        for attempt in range(4):
+            wait = self.gap - (time.time() - self.last)
+            if wait > 0:
+                time.sleep(wait)
+            self.last = time.time()
+            self.used += 1
+            req = urllib.request.Request(self.BASE.format(key=self.key) + path, headers={"User-Agent": "Goalscraper"})
+            try:
+                with urllib.request.urlopen(req, timeout=40) as r:
+                    return json.load(r)
+            except urllib.error.HTTPError as e:
+                if e.code == 429:              # free key: about 30 a minute
+                    time.sleep(20)
+                    continue
+                self.errors.append(f"TheSportsDB {path.split('?')[0]}: HTTP {e.code}")
+                return None
+            except Exception as e:
+                self.errors.append(f"TheSportsDB {path.split('?')[0]}: {e}"[:120])
+                return None
+        self.errors.append("TheSportsDB: too many requests, gave up")
+        return None
+
+    def day(self, league_id, d):
+        return [e for e in ((self.get(f"eventsday.php?d={d}&l={league_id}") or {}).get("events") or []) if e]
+
+
+TEAM_FILLER = {"fc", "cf", "sc", "ac", "afc", "cd", "ca", "club", "de", "sk", "fk", "if", "bk", "ff", "sv", "calcio",
+               "the", "sad", "ec", "se", "cr", "us", "as", "rc", "kv", "krc", "fcv"}
+
+
+def team_key(name):
+    return " ".join(w for w in norm(name).split() if w not in TEAM_FILLER)
+
+
+def match_team(name, pool, aliases):
+    """Strict match of a TheSportsDB team name to one OpenFootAPI team (pool: id -> name). None if unsure."""
+    if not pool:
+        return None
+    target = aliases.get(name)
+    keys = {tid: team_key(nm) for tid, nm in pool.items()}
+    for want in ([team_key(target)] if target else []) + [team_key(name)]:
+        exact = [t for t, k in keys.items() if k == want]
+        if len(exact) == 1:
+            return exact[0]
+    k = team_key(name)
+    if len(k) >= 4:
+        within = [t for t, pk in keys.items() if len(pk) >= 4 and (k in pk or pk in k)]
+        if len(within) == 1:
+            return within[0]
+    ranked = sorted(((SequenceMatcher(None, k, pk).ratio(), t) for t, pk in keys.items()), reverse=True)
+    if ranked and ranked[0][0] >= 0.86 and (len(ranked) == 1 or ranked[0][0] - ranked[1][0] >= 0.08):
+        return ranked[0][1]
+    return None
+
+
+def tsdb_time(e):
+    ts = e.get("strTimestamp")
+    if ts:
+        try:
+            t = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            return int((t if t.tzinfo else t.replace(tzinfo=timezone.utc)).timestamp())
+        except ValueError:
+            pass
+    if e.get("dateEvent") and e.get("strTime"):
+        try:
+            return int(datetime.fromisoformat(f"{e['dateEvent']}T{e['strTime'][:8]}+00:00").timestamp())
+        except ValueError:
+            pass
+    return None
 
 
 # ----------------------------------------------------------------------------------------------
@@ -574,11 +659,28 @@ class PredLog:
                     yield fid, e
 
     def settle(self, store, ref_ts):
+        index = None
         for month, m in self.months.items():
             for fid, e in m.items():
                 if e.get("r") is not None or e["ts"] >= ref_ts:
                     continue
                 v = store.matches.get(fid)
+                if fid.startswith("tsdb_"):
+                    # games listed by TheSportsDB: the result arrives from OpenFootAPI under its own id, often days later
+                    if index is None:
+                        index = defaultdict(list)
+                        for mid, w in store.matches.items():
+                            if w[7] == "finished" and w[5] is not None and not mid.startswith("tsdb_"):
+                                index[(w[0], w[3], w[4])].append((w[2], mid, w[5], w[6]))
+                    hit = [x for x in index.get((v[0], v[3], v[4]), []) if abs(x[0] - v[2]) <= 36 * 3600] if v else []
+                    if hit:
+                        e["r"], e["m"] = [hit[0][2], hit[0][3]], hit[0][1]
+                    elif e["ts"] < ref_ts - 14 * 86400:
+                        e["r"] = "void"
+                    else:
+                        continue
+                    self.dirty.add(month)
+                    continue
                 if v and v[7] == "finished" and v[5] is not None and v[6] is not None:
                     e["r"] = [v[5], v[6]]
                 elif (v and v[7] in ("postponed", "cancelled")) or e["ts"] < ref_ts - 4 * 86400:
@@ -745,6 +847,9 @@ class Build:
         self.of_to_no = {i: no for no, ids in self.comp_ids.items() for i in ids}
         self.discovered = {}        # no -> [ids] found later in OpenFootAPI's catalogue
         self.catchup_days = 0       # weekly catch-up: look this many days back for results added late
+        self.tsdb = None            # SportsDB client (upcoming games where OpenFootAPI only has results)
+        self.tsdb_aliases = {}
+        self.tsdb_used, self.tsdb_skipped, self.tsdb_leagues = Counter(), [], {}
         self.other = comp_doc["other_league_strength"]
         self.confed = comp_doc["confederation_strength"]
         self.nat_table_src = comp_doc.get("national_team_strength")
@@ -832,6 +937,53 @@ class Build:
         if not got:
             self.notes.append(f"No finished games returned for {self.store.comp_name(cid)} {season}")
 
+    def add_tsdb_fixtures(self):
+        """Competitions where OpenFootAPI only sends results: take the next 24 hours' games from TheSportsDB and
+        match both teams to OpenFootAPI's (strictly; a game is skipped rather than guessed)."""
+        old = self.ref_ts - 20 * 86400
+        for k in [k for k, v in self.store.matches.items() if k.startswith("tsdb_") and v[2] < old]:
+            del self.store.matches[k]
+        if not self.tsdb:
+            return
+        days = sorted({datetime.fromtimestamp(t, timezone.utc).date().isoformat() for t in (self.ref_ts, self.end_ts - 1)})
+        for c in sorted(self.comps, key=lambda c: (-c["value"], c["no"])):
+            lid, ids = c.get("tsdb_id"), self.comp_ids.get(c["no"])
+            if not lid or not ids:
+                continue
+            cid = ids[0]
+            events = [e for d in days for e in self.tsdb.day(lid, d)]
+            events = [e for e in events if (t := tsdb_time(e)) and self.ref_ts <= t < self.end_ts]
+            if not events:
+                continue
+            self.tsdb_leagues[c["no"]] = sorted({e.get("strLeague") or "?" for e in events})
+            self.backfill(cid, self.guess_season(cid))          # this league's results: team names and ratings
+            since = self.ref_ts - 400 * 86400
+            pool = {t: self.store.teams.get(t, [t])[0] for v in self.store.matches.values()
+                    if v[0] == cid and v[2] >= since and not str(v[3]).startswith("tsdb") for t in (v[3], v[4])}
+            pool.update({t: v[0] for t, v in self.store.teams.items() if v[1] == cid})
+            aliases = {**self.tsdb_aliases.get("all", {}), **self.tsdb_aliases.get(str(c["no"]), {})}
+            listed = {(v[3], v[4]) for k, v in self.store.matches.items()
+                      if v[0] == cid and not k.startswith("tsdb_") and self.ref_ts - 86400 <= v[2] < self.end_ts + 86400}
+            names = {n for e in events for n in (e.get("strHomeTeam") or "", e.get("strAwayTeam") or "")}
+            found = {n: match_team(n, pool, aliases) for n in names}
+            taken = Counter(t for t in found.values() if t)
+            found = {n: (t if t and taken[t] == 1 else None) for n, t in found.items()}   # two names, one team: unsure
+            for e in events:
+                h, a = e.get("strHomeTeam") or "", e.get("strAwayTeam") or ""
+                if norm(e.get("strStatus")) in ("postponed", "cancelled", "abandoned", "pst", "canc"):
+                    continue
+                hid, aid = found.get(h), found.get(a)
+                if not hid or not aid or hid == aid:
+                    miss = " and ".join(f"'{n}'" for n, t in ((h, hid), (a, aid)) if not t) or "teams"
+                    self.tsdb_skipped.append(f"{c['name']}: {h} v {a} skipped (couldn't match {miss})")
+                    continue
+                if (hid, aid) in listed:
+                    continue                               # OpenFootAPI lists it itself now
+                rnd = f"Round {e['intRound']}" if str(e.get("intRound") or "").isdigit() else ""
+                self.store.matches[f"tsdb_{e.get('idEvent')}"] = [cid, self.guess_season(cid), tsdb_time(e), hid, aid,
+                                                                  None, None, "scheduled", rnd, True]
+                self.tsdb_used[c["no"]] += 1
+
     def team_games(self, tid, since_ts):
         return sum(1 for v in self.store.matches.values()
                    if v[7] == "finished" and v[5] is not None and since_ts <= v[2] < self.ref_ts and tid in (v[3], v[4]))
@@ -883,6 +1035,7 @@ class Build:
             d += timedelta(days=1)
         self.sweep(dates)
         self.store.last_sweep = today.isoformat()
+        self.add_tsdb_fixtures()
 
         # 2) the window
         cands = defaultdict(list)
@@ -912,6 +1065,8 @@ class Build:
         for c in order:
             no = c["no"]
             cov = {"status": "no_games", "games": len(cands.get(no, [])), "note": ""}
+            if self.tsdb_used.get(no):
+                cov["note"] = "Games from TheSportsDB, results from OpenFootAPI"
             self.cov[no] = cov
             if not self.comp_ids.get(no) and not c.get("virtual_of"):
                 cov["status"] = "not_available"
@@ -1307,7 +1462,9 @@ def record_summary(plog, ref_ts, tz):
 def build_results(archive, plog, build, store, tz, check, gen):
     """All results for the app: one file per month (every result in the archive) with Goalscraper's section scores
     for the games it rated. Written to the published site only; the archive itself is the permanent copy."""
-    logged = {fid: e for fid, e in plog.entries()}
+    logged = {}
+    for fid, e in plog.entries():
+        logged[e.get("m") or fid] = e          # TheSportsDB-listed games are archived under OpenFootAPI's id
     files, days = {}, set()
     for m in archive.months_on_disk() + sorted(set(archive.months) - set(archive.months_on_disk())):
         if m in files:
@@ -1516,6 +1673,14 @@ def main(argv=None):
     for k, v in default_state(settings).items():
         ms.setdefault(k, v)
     build = Build(api, settings, comp_doc, store, ref, ms)
+    tcfg = settings.get("thesportsdb") or {}
+    if tcfg.get("enabled", True) and mode == "full":
+        if args.mock:
+            from mockopenfoot import MockSportsDB
+            build.tsdb = MockSportsDB(api)
+        else:
+            build.tsdb = SportsDB(os.environ.get("THESPORTSDB_KEY") or tcfg.get("key", "123"), tcfg.get("seconds_between_requests", 2.2))
+        build.tsdb_aliases = load_json(CONFIG / "team_aliases.json", {})
     if not store.matches and not first_archive:
         n = archive.rebuild_store(store, build.ref_ts - 500 * 86400, build.ref_ts - 1200 * 86400)
         print(f"  saved results were missing (GitHub's cache was empty): rebuilt {n} from the archive")
@@ -1674,7 +1839,9 @@ def main(argv=None):
     for c in sorted(comp_doc["competitions"], key=lambda c: (-c["value"], c["prestige"], c["no"])):
         cv = dict(build.cov.get(c["no"], {"status": "no_games", "games": 0, "note": ""}))
         ids = build.comp_ids.get(c["no"]) or [i for n in c.get("virtual_of", []) for i in build.comp_ids.get(n, [])]
-        if cv["status"] == "no_games" and not c.get("virtual_of") and results_only(c["no"], build.comp_ids.get(c["no"])):
+        if cv["status"] == "no_games" and c.get("tsdb_id") and build.comp_ids.get(c["no"]):
+            cv["note"] = "Games come from TheSportsDB (OpenFootAPI only has results)"
+        elif cv["status"] == "no_games" and not c.get("virtual_of") and results_only(c["no"], build.comp_ids.get(c["no"])):
             cv.update(status="results_only", note="OpenFootAPI only sends results here, never upcoming games, so they can't be scored")
         comps_out.append({"no": c["no"], "name": c["name"], "group": c["group"], "value": c["value"],
                           "prestige": c["prestige"], **cv, "newly_found": c["no"] in recent,
@@ -1682,7 +1849,10 @@ def main(argv=None):
     coverage = {
         "generated_utc": gen, "plan": api.plan, "source": "OpenFootAPI", "manual": not scheduled,
         "requests_used": api.used, "requests_available": api.limit, "monthly_remaining": api.quota_remaining,
-        "games_scored": len(preds), **stats, "competitions": comps_out, "notes": build.notes[:20], "last_error": None,
+        "games_scored": len(preds), **stats, "competitions": comps_out,
+        "notes": (build.tsdb_skipped + (build.tsdb.errors if build.tsdb else []) + build.notes)[:30], "last_error": None,
+        "thesportsdb": {"requests": build.tsdb.used if build.tsdb else 0, "games": sum(build.tsdb_used.values()),
+                        "skipped": len(build.tsdb_skipped), "leagues": {str(k): v for k, v in build.tsdb_leagues.items()}},
         "archive_months": len(archive.months_on_disk()), "catchup_last": today_s if catchup else state.get("catchup_local_date"),
         "results_only_watch_days": watched,
         "model": {"version": ms["version"], "changes": ms["changes"][:15], "intl_pass": ipass, "intl_pass_end": i_end,
@@ -1701,6 +1871,11 @@ def main(argv=None):
     save_json(DATA / "state.json", state)
     build_site(files)
     gh_output(ran="true")
+    if build.tsdb:
+        print(f"TheSportsDB: {sum(build.tsdb_used.values())} games added from {len(build.tsdb_used)} competitions, "
+              f"{len(build.tsdb_skipped)} skipped, {build.tsdb.used} requests.")
+        for line in build.tsdb_skipped[:10] + build.tsdb.errors[:5]:
+            print("  " + line)
     print(f"Plan: {api.plan}. Scored {len(preds)} games. Requests used: {api.used} (run limit {api.limit}). "
           f"Monthly left: {api.quota_remaining}. International pass mark {ipass['value']} ({ipass['games']} games).")
     for key in SECTIONS:

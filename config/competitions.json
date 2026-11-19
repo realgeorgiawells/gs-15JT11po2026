@@ -86,7 +86,8 @@
    "kind": "league",
    "country": "Scotland",
    "strength": 62,
-   "openfoot_id": "comp_scottish_prem_sco"
+   "openfoot_id": "comp_scottish_prem_sco",
+   "tsdb_id": 4330
   },
   {
    "no": 7,
@@ -209,7 +210,8 @@
    "kind": "league",
    "country": "Portugal",
    "strength": 78,
-   "openfoot_id": "comp_primeira_liga_pt"
+   "openfoot_id": "comp_primeira_liga_pt",
+   "tsdb_id": 4344
   },
   {
    "no": 15,
@@ -221,7 +223,8 @@
    "kind": "league",
    "country": "Belgium",
    "strength": 72,
-   "openfoot_id": "comp_pro_league_be"
+   "openfoot_id": "comp_pro_league_be",
+   "tsdb_id": 4338
   },
   {
    "no": 16,
@@ -245,7 +248,8 @@
    "kind": "league",
    "country": "Turkey",
    "strength": 70,
-   "openfoot_id": "comp_super_lig_tr"
+   "openfoot_id": "comp_super_lig_tr",
+   "tsdb_id": 4339
   },
   {
    "no": 18,
@@ -257,7 +261,8 @@
    "kind": "league",
    "country": "Greece",
    "strength": 66,
-   "openfoot_id": "comp_super_league_grc"
+   "openfoot_id": "comp_super_league_grc",
+   "tsdb_id": 4336
   },
   {
    "no": 19,
@@ -269,7 +274,8 @@
    "kind": "league",
    "country": "Sweden",
    "strength": 58,
-   "openfoot_id": "comp_allsvenskan_swe"
+   "openfoot_id": "comp_allsvenskan_swe",
+   "tsdb_id": 4347
   },
   {
    "no": 20,
@@ -281,7 +287,8 @@
    "kind": "league",
    "country": "Ireland",
    "strength": 44,
-   "openfoot_id": "comp_premier_division_irl"
+   "openfoot_id": "comp_premier_division_irl",
+   "tsdb_id": 4643
   },
   {
    "no": 21,
@@ -314,7 +321,8 @@
    "kind": "league",
    "country": "USA",
    "strength": 66,
-   "openfoot_id": "comp_mls_usa"
+   "openfoot_id": "comp_mls_usa",
+   "tsdb_id": 4346
   },
   {
    "no": 23,
@@ -338,7 +346,8 @@
    "kind": "league",
    "country": "Japan",
    "strength": 64,
-   "openfoot_id": "comp_j1_league_jpn"
+   "openfoot_id": "comp_j1_league_jpn",
+   "tsdb_id": 4633
   },
   {
    "no": 25,
@@ -810,7 +819,8 @@
    "kind": "league",
    "country": "Denmark",
    "strength": 62,
-   "openfoot_id": "comp_superliga_dnk"
+   "openfoot_id": "comp_superliga_dnk",
+   "tsdb_id": 4340
   },
   {
    "no": 55,
@@ -822,7 +832,8 @@
    "kind": "league",
    "country": "Norway",
    "strength": 60,
-   "openfoot_id": "comp_eliteserien_nor"
+   "openfoot_id": "comp_eliteserien_nor",
+   "tsdb_id": 4358
   },
   {
    "no": 56,
@@ -834,7 +845,8 @@
    "kind": "league",
    "country": "Austria",
    "strength": 62,
-   "openfoot_id": "comp_bundesliga_aut"
+   "openfoot_id": "comp_bundesliga_aut",
+   "tsdb_id": 4621
   },
   {
    "no": 57,
@@ -858,7 +870,8 @@
    "kind": "league",
    "country": "Poland",
    "strength": 58,
-   "openfoot_id": "comp_ekstraklasa_pol"
+   "openfoot_id": "comp_ekstraklasa_pol",
+   "tsdb_id": 4422
   },
   {
    "no": 59,
@@ -930,7 +943,8 @@
    "kind": "league",
    "country": "Brazil",
    "strength": 80,
-   "openfoot_id": "comp_brasileirao_bra"
+   "openfoot_id": "comp_brasileirao_bra",
+   "tsdb_id": 4351
   },
   {
    "no": 65,
@@ -942,7 +956,8 @@
    "kind": "league",
    "country": "Argentina",
    "strength": 78,
-   "openfoot_id": "comp_liga_profesional_arg"
+   "openfoot_id": "comp_liga_profesional_arg",
+   "tsdb_id": 4406
   },
   {
    "no": 66,
@@ -954,7 +969,8 @@
    "kind": "league",
    "country": "Mexico",
    "strength": 70,
-   "openfoot_id": "comp_liga_mx_mex"
+   "openfoot_id": "comp_liga_mx_mex",
+   "tsdb_id": 4350
   },
   {
    "no": 67,
@@ -1002,7 +1018,8 @@
    "kind": "league",
    "country": "Ecuador",
    "strength": 62,
-   "openfoot_id": "comp_ligapro_ecu"
+   "openfoot_id": "comp_ligapro_ecu",
+   "tsdb_id": 4686
   },
   {
    "no": 71,
@@ -1050,7 +1067,8 @@
    "kind": "league",
    "country": "Italy",
    "strength": 68,
-   "openfoot_id": "comp_serie_b_it"
+   "openfoot_id": "comp_serie_b_it",
+   "tsdb_id": 4394
   },
   {
    "no": 75,
@@ -1062,7 +1080,8 @@
    "kind": "league",
    "country": "Spain",
    "strength": 70,
-   "openfoot_id": "comp_segunda_es"
+   "openfoot_id": "comp_segunda_es",
+   "tsdb_id": 4400
   },
   {
    "no": 76,
@@ -1074,7 +1093,8 @@
    "kind": "league",
    "country": "France",
    "strength": 66,
-   "openfoot_id": "comp_ligue_2_fr"
+   "openfoot_id": "comp_ligue_2_fr",
+   "tsdb_id": 4401
   },
   {
    "no": 77,
@@ -1425,5 +1445,6 @@
    "FYR Macedonia": "North Macedonia",
    "Faroe Is.": "Faroe Islands"
   }
- }
+ },
+ "_about_tsdb": "tsdb_id: TheSportsDB league id, used for upcoming games where OpenFootAPI only has results."
 }
