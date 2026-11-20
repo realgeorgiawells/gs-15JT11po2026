@@ -523,7 +523,7 @@ async function resRows(){
 }
 const STATUS = {covered: ["green", "Covered"], partial: ["amber", "Partly covered"], no_games: ["grey", "No games"],
   omitted_budget: ["amber", "Omitted: request limit"], blocked_plan: ["red", "Blocked"], error: ["red", "Error"],
-  not_available: ["grey", "Not on free plan"], results_only: ["amber", "Results only"]};
+  not_available: ["grey", "Not on free plan"], results_only: ["amber", "Results only"], switched_off: ["grey", "Switched off"]};
 let covProblems = false;
 function coverageView(){
   const back = `<button class="back" data-back><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>BACK</button>`;
@@ -558,7 +558,7 @@ function coverageView(){
   h += `<div class="sh"><h2 style="font-size:12px">Competitions</h2></div>
     <div class="subtabs"><button data-cv="all" class="${covProblems ? "" : "on"}">All ${comps.length}</button><button data-cv="prob" class="${covProblems ? "on" : ""}">Problems only</button></div><div class="panel">`;
   for (const c of comps) {
-    if (covProblems && ["covered", "no_games", "not_available"].includes(c.status)) continue;
+    if (covProblems && ["covered", "no_games", "not_available", "switched_off"].includes(c.status)) continue;
     const [cls, label] = STATUS[c.status] || ["grey", c.status];
     const detail = c.status === "covered" || c.status === "partial" ? `${c.games} game${c.games === 1 ? "" : "s"}` : "";
     h += `<div class="cov"><div class="vb">${c.value}</div><div><div class="t">${esc(c.name)}${c.newly_found ? ` <span class="chip green">New</span>` : ""}</div>

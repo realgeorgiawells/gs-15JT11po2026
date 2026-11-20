@@ -1049,6 +1049,8 @@ class Build:
                 continue
             if no in (27, 28, 29) and is_qualifying_round(rnd):
                 no = 30
+            if self.comp_by_no[no].get("picks") is False:   # switched off: results still kept, games not scored
+                continue
             if status in ("postponed", "cancelled"):
                 stats["dropped_postponed"] += 1
                 continue
@@ -1839,7 +1841,9 @@ def main(argv=None):
     for c in sorted(comp_doc["competitions"], key=lambda c: (-c["value"], c["prestige"], c["no"])):
         cv = dict(build.cov.get(c["no"], {"status": "no_games", "games": 0, "note": ""}))
         ids = build.comp_ids.get(c["no"]) or [i for n in c.get("virtual_of", []) for i in build.comp_ids.get(n, [])]
-        if cv["status"] == "no_games" and c.get("tsdb_id") and build.comp_ids.get(c["no"]):
+        if c.get("picks") is False:
+            cv.update(status="switched_off", games=0, note="Switched off: results are kept (they help rate teams in Europe), games aren't scored")
+        elif cv["status"] == "no_games" and c.get("tsdb_id") and build.comp_ids.get(c["no"]):
             cv["note"] = "Games come from TheSportsDB (OpenFootAPI only has results)"
         elif cv["status"] == "no_games" and not c.get("virtual_of") and results_only(c["no"], build.comp_ids.get(c["no"])):
             cv.update(status="results_only", note="OpenFootAPI only sends results here, never upcoming games, so they can't be scored")

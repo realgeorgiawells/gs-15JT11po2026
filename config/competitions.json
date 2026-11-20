@@ -931,7 +931,8 @@
    "kind": "league",
    "country": "Ukraine",
    "strength": 57,
-   "openfoot_id": "comp_premier_league_ukr"
+   "openfoot_id": "comp_premier_league_ukr",
+   "picks": false
   },
   {
    "no": 64,
@@ -1446,5 +1447,6 @@
    "Faroe Is.": "Faroe Islands"
   }
  },
- "_about_tsdb": "tsdb_id: TheSportsDB league id, used for upcoming games where OpenFootAPI only has results."
+ "_about_tsdb": "tsdb_id: TheSportsDB league id, used for upcoming games where OpenFootAPI only has results.",
+ "_about_picks": "picks: false switches a competition off: its results are still collected (for team ratings), but its games are never scored or picked."
 }
