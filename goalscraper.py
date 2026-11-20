@@ -657,6 +657,15 @@ def calibrated(lh, la, group, ms):
 DEFAULT_AT1 = {"goals": 0.30, "misses": 0.60, "ballon": 0.45, "btts": 0.80}
 
 
+def pass_marks(S, key):
+    """(club, international) pass marks for a section. Each section can set its own (sections.X.min_score);
+    internationals sit below it by the current international allowance, which shrinks to 0 as results build up."""
+    club = S["sections"][key].get("min_score", S["min_score"])
+    start, end, _ = intl_pass_cfg(S)
+    gap = max(0, end - S.get("_pass_intl", start))
+    return club, club - gap
+
+
 def intl_pass_cfg(S):
     """(start, end, games per point) for the international pass mark, which rises as international results build up."""
     c = S.get("international_pass_mark") or {}
@@ -1483,7 +1492,7 @@ def rank_sections(preds, S):
         for r, p in enumerate(cand):
             s = p["sec"][key]
             s["rank"] = r + 1
-            mn = S.get("_pass_intl", intl_pass_cfg(S)[0]) if p["intl"] else S["min_score"]
+            mn = pass_marks(S, key)[1 if p["intl"] else 0]
             s["pick"] = s["score"] >= mn and n < S["top_n"]
             n += s["pick"]
         for p in preds:
@@ -1507,7 +1516,7 @@ def rank_by_day(games, S, tz):
                 sec["rank"] = r + 1
                 if g.get("_carry"):
                     continue
-                mn = S.get("_pass_intl", intl_pass_cfg(S)[0]) if g["intl"] else S["min_score"]
+                mn = pass_marks(S, key)[1 if g["intl"] else 0]
                 exc = S["sections"][key].get("exceptional", 101)
                 sec["exceptional"] = sec["score"] >= exc
                 # top 10, plus any exceptional game beyond that (up to max_picks a day)
@@ -1959,6 +1968,7 @@ def main(argv=None):
         "app": "Goalscraper", "generated_utc": gen, "source": "OpenFootAPI", "plan": api.plan,
         "window_start_ts": build.ref_ts, "window_end_ts": build.end_ts, "timezone": settings["timezone"],
         "top_n": settings["top_n"], "min_club": settings["min_score"], "min_intl": used_pass, "min_intl_end": i_end,
+        "pass": {k: list(pass_marks(settings, k)) + [settings["sections"][k].get("min_score", settings["min_score"])] for k in SECTIONS},
         "exceptional": {k: v.get("exceptional") for k, v in settings["sections"].items() if isinstance(v, dict)},
         "max_picks": settings.get("max_picks", settings["top_n"]),
         "ballon_min": settings["sections"]["ballon"]["min_favourite"],

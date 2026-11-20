@@ -266,6 +266,8 @@ const today = () => new Intl.DateTimeFormat("en-CA", {timeZone: TZ}).format(new 
 const dayGames = () => D.games.filter(g => gameDay(g) === today());
 const todayName = () => new Intl.DateTimeFormat("en-IE", {timeZone: "UTC", weekday: "long", day: "numeric", month: "long"}).format(new Date(today() + "T12:00:00Z"));
 const kicked = g => g.ts <= now() || g.tags.includes("postponed") || !!g.result;
+/* pass marks per section: [club, international now, international target] */
+const passOf = key => (D.pass && D.pass[key]) || [D.min_club, D.min_intl, D.min_intl_end || D.min_club];
 const picks = key => dayGames().filter(g => g.sec[key].pick).sort((a, b) => a.sec[key].rank - b.sec[key].rank);
 const teamOf = (g, key) => g[g.sec[key].team].name;
 
@@ -322,8 +324,9 @@ const nextOpen = {};
 function nextBest(key){
   const rest = dayGames().filter(g => g.sec[key].listed !== false && !g.sec[key].pick && !kicked(g)).sort((a, b) => a.sec[key].rank - b.sec[key].rank);
   if (!rest.length) return "";
-  const passed = rest.filter(g => g.sec[key].score >= (g.intl ? D.min_intl : D.min_club));
-  const below = rest.filter(g => g.sec[key].score < (g.intl ? D.min_intl : D.min_club));
+  const [pc, pi] = passOf(key);
+  const passed = rest.filter(g => g.sec[key].score >= (g.intl ? pi : pc));
+  const below = rest.filter(g => g.sec[key].score < (g.intl ? pi : pc));
   let h = `<button class="fold ${nextOpen[key] ? "open" : ""}" data-next="${key}"><span>NEXT BEST (${rest.length})</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
   if (nextOpen[key]) {
     h += `<div class="panel dim" style="margin-top:8px">`;
@@ -339,7 +342,7 @@ const kickOpen = {};
 function sectionView(key){
   const all = picks(key), S = SEC[key], list = all.filter(g => !kicked(g)), done = all.filter(kicked);
   let h = `<div class="sh"><h2>${S.name}</h2><p>${S.blurb()}</p>
-    <div class="meta">${todayName()} · ${all.length} pick${all.length === 1 ? "" : "s"}${done.length ? ` (${done.length} kicked off)` : ""} · minimum score ${D.min_club} (internationals ${D.min_intl}${D.min_intl_end && D.min_intl < D.min_intl_end ? `, rising to ${D.min_intl_end}` : ""}) · tap a game for details</div></div>`;
+    <div class="meta">${todayName()} · ${all.length} pick${all.length === 1 ? "" : "s"}${done.length ? ` (${done.length} kicked off)` : ""} · minimum score ${passOf(key)[0]} (internationals ${passOf(key)[1]}${passOf(key)[1] < passOf(key)[2] ? `, rising to ${passOf(key)[2]}` : ""}) · tap a game for details</div></div>`;
   if (!all.length) h += `<div class="note"><b>NO PICKS TODAY</b> &nbsp;No games today reached the minimum score.</div>`;
   else if (!list.length) h += `<div class="note"><b>ALL KICKED OFF</b> &nbsp;Today's picks have all started; they're below. Tomorrow's appear at midnight.</div>`;
   else h += `<div class="panel">${list.map(g => pickRow(g, key)).join("")}</div>`;
@@ -611,7 +614,7 @@ function coverageView(){
 function howView(){
   return `<button class="back" data-back><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>BACK</button>
     <div class="sh"><h2>How it works</h2></div><div class="panel prose">
-    <h3>The score</h3>Every pick gets a score from 1 to 100 for how unlikely it is to go wrong, on its own section's scale. It isn't a percentage. A game becomes a pick at ${D.min_club} or above (${D.min_intl} for internationals), up to ${D.top_n} per section. Fewer qualify on some days, and lists are never padded. Next best shows the rest.
+    <h3>The score</h3>Every pick gets a score from 1 to 100 for how unlikely it is to go wrong, on its own section's scale. It isn't a percentage. A game becomes a pick at its section's minimum score: ${D.pass ? `${D.pass.goals[0]} for Easy Goals, Misses and Raining Goals, ${D.pass.ballon[0]} for Ballon d'Or` : D.min_club} (internationals a little lower while their results build up), up to ${D.top_n} per section. Fewer qualify on some days, and lists are never padded. Next best shows the rest.
     <h3>Easy Goals</h3>Goes wrong on a 0-0. Games more than ${Math.round(D.goals_max * 100)}% likely to have a goal are too short to be picks; a game right at ${Math.round(D.goals_max * 100)}% scores 100.
     <h3>Misses and Ballon d'Or</h3>A game goes on only one of the two. Ballon d'Or takes clear favourites (${Math.round(D.ballon_min * 100)}% or more to win). Every other game with an underdog no longer than ${D.misses_longest}/1 can go in Misses, where a 3/1 underdog scores about 50 and a ${D.misses_longest}/1 underdog 100.
     <h3>Raining Goals</h3>Goes wrong if either team fails to score.
