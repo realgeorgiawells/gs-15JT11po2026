@@ -1,9 +1,9 @@
 {
- "_about": "Main settings for Goalscraper (data from OpenFootAPI's free plan). The full run is at run_time_local and a short evening update (results so far, postponements) at evening_time_local, Irish time. The model's learned adjustments live in data/model_state.json, not here.",
+ "_about": "Main settings for Goalscraper (data from OpenFootAPI's free plan). The full run is at run_time_local and a short evening update (results so far, postponements) at evening_time_local, Irish time. The model's learned adjustments live in data/model_state.json, not here. Each run scores today's remaining games and all of tomorrow's (days_ahead), and picks the top games per day; the app shows today's picks and switches to the next day at midnight.",
  "timezone": "Europe/Dublin",
  "run_time_local": "06:15",
  "evening_time_local": "18:00",
- "window_hours": 24,
+ "days_ahead": 1,
  "top_n": 10,
  "min_score": 50,
  "international_pass_mark": {

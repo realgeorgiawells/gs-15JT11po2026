@@ -259,7 +259,13 @@ const SEC = {
   btts:   {name: "Raining Goals",blurb: () => "Games most likely to see both teams score.",
            fig: g => [pct(g.p_btts, 0), "both score"]},
 };
-const picks = key => D.games.filter(g => g.sec[key].pick).sort((a, b) => a.sec[key].rank - b.sec[key].rank);
+/* the app shows one Irish day at a time: today's picks, switching to the next day at midnight */
+const gameDay = g => g.day || new Intl.DateTimeFormat("en-CA", {timeZone: TZ}).format(new Date(g.ts * 1000));
+const today = () => new Intl.DateTimeFormat("en-CA", {timeZone: TZ}).format(new Date());
+const dayGames = () => D.games.filter(g => gameDay(g) === today());
+const todayName = () => new Intl.DateTimeFormat("en-IE", {timeZone: "UTC", weekday: "long", day: "numeric", month: "long"}).format(new Date(today() + "T12:00:00Z"));
+const kicked = g => g.ts <= now() || g.tags.includes("postponed") || !!g.result;
+const picks = key => dayGames().filter(g => g.sec[key].pick).sort((a, b) => a.sec[key].rank - b.sec[key].rank);
 const teamOf = (g, key) => g[g.sec[key].team].name;
 
 const OPEN = new Set();
@@ -313,7 +319,7 @@ function pickRow(g, key){
 /* ---------- next best (below the picks) ---------- */
 const nextOpen = {};
 function nextBest(key){
-  const rest = D.games.filter(g => g.sec[key].listed !== false && !g.sec[key].pick).sort((a, b) => a.sec[key].rank - b.sec[key].rank);
+  const rest = dayGames().filter(g => g.sec[key].listed !== false && !g.sec[key].pick && !kicked(g)).sort((a, b) => a.sec[key].rank - b.sec[key].rank);
   if (!rest.length) return "";
   const passed = rest.filter(g => g.sec[key].score >= (g.intl ? D.min_intl : D.min_club));
   const below = rest.filter(g => g.sec[key].score < (g.intl ? D.min_intl : D.min_club));
@@ -328,14 +334,21 @@ function nextBest(key){
 }
 
 /* ---------- views ---------- */
+const kickOpen = {};
 function sectionView(key){
-  const list = picks(key), S = SEC[key];
+  const all = picks(key), S = SEC[key], list = all.filter(g => !kicked(g)), done = all.filter(kicked);
   let h = `<div class="sh"><h2>${S.name}</h2><p>${S.blurb()}</p>
-    <div class="meta">${list.length} pick${list.length === 1 ? "" : "s"} · minimum score ${D.min_club} (internationals ${D.min_intl}${D.min_intl_end && D.min_intl < D.min_intl_end ? `, rising to ${D.min_intl_end}` : ""}) · tap a game for details · next best below</div></div>`;
-  if (!list.length) return h + `<div class="note"><b>NO PICKS TODAY</b> &nbsp;No games reached the minimum score.</div>` + nextBest(key);
-  h += `<div class="panel">${list.map(g => pickRow(g, key)).join("")}</div>`;
-  if (list.length < D.top_n) h += `<div class="note"><b>ONLY ${list.length} PICK${list.length === 1 ? "" : "S"}</b> &nbsp;Only ${list.length} game${list.length === 1 ? "" : "s"} reached the minimum score today, so the list isn't padded with weaker ones.</div>`;
-  return h + nextBest(key);
+    <div class="meta">${todayName()} · ${all.length} pick${all.length === 1 ? "" : "s"}${done.length ? ` (${done.length} kicked off)` : ""} · minimum score ${D.min_club} (internationals ${D.min_intl}${D.min_intl_end && D.min_intl < D.min_intl_end ? `, rising to ${D.min_intl_end}` : ""}) · tap a game for details</div></div>`;
+  if (!all.length) h += `<div class="note"><b>NO PICKS TODAY</b> &nbsp;No games today reached the minimum score.</div>`;
+  else if (!list.length) h += `<div class="note"><b>ALL KICKED OFF</b> &nbsp;Today's picks have all started; they're below. Tomorrow's appear at midnight.</div>`;
+  else h += `<div class="panel">${list.map(g => pickRow(g, key)).join("")}</div>`;
+  if (all.length && all.length < D.top_n) h += `<div class="note"><b>ONLY ${all.length} PICK${all.length === 1 ? "" : "S"}</b> &nbsp;Only ${all.length} game${all.length === 1 ? "" : "s"} today reached the minimum score, so the list isn't padded with weaker ones.</div>`;
+  h += nextBest(key);
+  if (done.length) {
+    h += `<button class="fold ${kickOpen[key] ? "open" : ""}" data-kick="${key}"><span>ALREADY KICKED OFF (${done.length})</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
+    if (kickOpen[key]) h += `<div class="panel" style="margin-top:8px">${done.map(g => pickRow(g, key)).join("")}</div>`;
+  }
+  return h;
 }
 function selectedGames(){
   const m = new Map();
@@ -358,31 +371,33 @@ let foldOpen = false;
 function selectedView(){
   const pp = x => x.g.tags.includes("postponed") || !!x.g.result;
   const all = selectedGames(), up = all.filter(x => x.g.ts > now() && !pp(x)), st = all.filter(x => x.g.ts <= now() || pp(x));
-  let h = `<div class="sh"><h2>Selected games</h2><p>Every pick from Easy Goals, Misses and Ballon d'Or, in kickoff order.</p></div>`;
+  let h = `<div class="sh"><h2>Selected games</h2><p>Today's picks from Easy Goals, Misses and Ballon d'Or, in kickoff order.</p><div class="meta">${todayName()}</div></div>`;
   if (up.length) {
     const n = up[0].g;
     h += `<div class="count"><div class="k">NEXT KICK-OFF</div><div class="t" id="cd">--:--:--</div>
       <div class="g">${esc(n.home.name)} v ${esc(n.away.name)}</div><div class="m">${tm(n.ts)} · ${esc(n.comp)}</div></div>`;
   }
   h += `<div class="sh" style="padding-top:14px"><div class="meta">${up.length} to come · ${st.length} already started${st.some(x => x.g.tags.includes("postponed")) ? " or postponed" : ""}${D.updated_utc ? ` · results updated ${tm(Date.parse(D.updated_utc) / 1000)}` : ""}</div></div>`;
-  h += up.length ? `<div class="panel">${up.map(selRow).join("")}</div>` : `<div class="note"><b>ALL STARTED</b> &nbsp;Every selected game has kicked off.</div>`;
+  h += up.length ? `<div class="panel">${up.map(selRow).join("")}</div>` : all.length ? `<div class="note"><b>ALL STARTED</b> &nbsp;Every selected game today has kicked off. Tomorrow's appear at midnight.</div>` : `<div class="note"><b>NO PICKS TODAY</b></div>`;
   if (st.length) {
     h += `<button class="fold ${foldOpen ? "open" : ""}" id="fold"><span>ALREADY STARTED${st.some(x => x.g.tags.includes("postponed")) ? " / POSTPONED" : ""} (${st.length})</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
     if (foldOpen) h += `<div class="panel" style="margin-top:8px">${st.map(selRow).join("")}</div>`;
   }
   return h;
 }
+let allDay = null;
 function allView(){
+  if (!allDay || allDay < today()) allDay = today();
   const comps = [...new Set(D.games.map(g => g.comp))].sort();
   return `<button class="back" data-back><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>BACK</button>
-    <div class="sh"><h2>All games</h2><p>Every game in the next 24 hours, with its score in each section.</p></div>
-    <div class="controls"><input id="q" placeholder="Search team or competition"><select id="fc"><option value="">All competitions</option>${comps.map(c => `<option>${esc(c)}</option>`).join("")}</select>
+    <div class="sh"><h2>All games</h2><p>Every game scored for today and tomorrow, with its score in each section.</p></div>
+    <div class="controls"><select id="dy">${[...new Set(D.games.map(gameDay))].sort().filter(d => d >= today()).map(d => `<option value="${d}" ${d === allDay ? "selected" : ""}>${d === today() ? "Today" : esc(new Intl.DateTimeFormat("en-IE", {timeZone: "UTC", weekday: "long", day: "numeric", month: "short"}).format(new Date(d + "T12:00:00Z")))}</option>`).join("")}</select><input id="q" placeholder="Search team or competition"><select id="fc"><option value="">All competitions</option>${comps.map(c => `<option>${esc(c)}</option>`).join("")}</select>
     <select id="so"><option value="ko">Sort: kickoff</option><option value="goals">Sort: Easy Goals</option><option value="btts">Sort: Raining Goals</option></select></div>
     <div class="panel" id="allList"></div>`;
 }
 function allRows(){
   const q = ($("#q")?.value || "").toLowerCase(), fc = $("#fc")?.value || "", so = $("#so")?.value || "ko";
-  let l = D.games.filter(g => (!fc || g.comp === fc) && (g.home.name + " " + g.away.name + " " + g.comp).toLowerCase().includes(q));
+  let l = D.games.filter(g => gameDay(g) === allDay && (!fc || g.comp === fc) && (g.home.name + " " + g.away.name + " " + g.comp).toLowerCase().includes(q));
   l.sort((a, b) => so === "ko" ? a.ts - b.ts : b.sec[so].score - a.sec[so].score);
   const mini = (lab, v) => `<span class="mini" style="color:${hue(v)}"><i>${lab}</i>${v.toFixed(0)}</span>`;
   $("#allList").innerHTML = l.map(g => {
@@ -576,7 +591,7 @@ function howView(){
     <h3>Raining Goals</h3>Goes wrong if either team fails to score.
     <h3>Team strength</h3>Attack and defence ratings come from every result, adjusted for the opponent and the league, and update every morning. Recent form counts a little extra. National teams use three years of internationals.
     <h3>Learning from results</h3>Every prediction is stored and checked against what happened. Each morning, settings are nudged where the evidence shows the forecasts are off, separately for clubs and internationals. Changes are listed on the Coverage screen.
-    <h3>Updates</h3>The list is made once, at 6:15 each morning, and covers the next 24 hours. At about 6 pm a short update marks postponed games and adds the results so far; it never changes picks or scores.
+    <h3>Updates</h3>The list is made at 6:15 each morning. It scores today's games and tomorrow's, and picks the best games for each day; the app shows today's, with games that have kicked off moved to the bottom, and switches to tomorrow's at midnight (they're refreshed again at 6:15). At about 6 pm a short update marks postponed games and adds the results so far; it never changes picks or scores.
     <h3>Results only</h3>Some competitions on OpenFootAPI only get results after the games are played, never the games beforehand. For most of them (Scotland, Portugal, Brazil, MLS and others) Goalscraper takes the upcoming games from TheSportsDB instead, matching both teams strictly; a game it can't match is skipped and listed under Notes on Coverage. Their picks settle when OpenFootAPI adds the results, which can take a few days. Any others can't be scored. Coverage labels them "Results only" (after two weeks of watching), and the label goes as soon as OpenFootAPI lists their games in advance. Their results still feed the team ratings. Every Monday, Goalscraper also looks back 14 days for results that were added late.
     <h3>International pass mark</h3>Internationals start with a lower pass mark because national teams play few games, which keeps their scores lower. It rises 1 point for every 50 international games Goalscraper has predicted and settled, up to the club mark, and pauses while the model check flags internationals.
     <h3>Record</h3>Each section's tab shows its hit rate over the last 30 days and all time, how each score band and competition has done, and every settled pick by day. All results holds every result stored, with Goalscraper's scores for the games it rated, and the model check: forecast against actual for each competition, flagged when the gap is too big to be bad luck.
@@ -628,6 +643,7 @@ document.addEventListener("click", e => {
   if (e.target.closest("#fold")) { foldOpen = !foldOpen; render(); return; }
   const rt = e.target.closest("[data-rt]"); if (rt) { recTab = rt.dataset.rt; recDays = 7; render(); return; }
   if (e.target.closest("[data-older]")) { recDays += 7; keepScroll(); return; }
+  const kk = e.target.closest("[data-kick]"); if (kk) { kickOpen[kk.dataset.kick] = !kickOpen[kk.dataset.kick]; keepScroll(); return; }
   if (e.target.closest("[data-comp]")) { compOpen = !compOpen; keepScroll(); return; }
   if (e.target.closest("[data-chk]")) { chkOpen = !chkOpen; keepScroll(); return; }
   const rm = e.target.closest("[data-rm]"); if (rm) { resMine = rm.dataset.rm === "1"; resComp = ""; keepScroll(); return; }
@@ -639,6 +655,7 @@ document.addEventListener("click", e => {
 });
 document.addEventListener("input", e => { if (e.target.id === "q") allRows(); if (e.target.id === "rq") { resQ = e.target.value; resRows(); } });
 document.addEventListener("change", e => { if (e.target.id === "fc" || e.target.id === "so") allRows();
+  if (e.target.id === "dy") { allDay = e.target.value; allRows(); }
   if (e.target.id === "rc") { resComp = e.target.value; keepScroll(); }
   if (e.target.id === "rd") { resDate = e.target.value; resRows(); } });
 function keepScroll(){ const y = window.scrollY; render(); window.scrollTo(0, y); }

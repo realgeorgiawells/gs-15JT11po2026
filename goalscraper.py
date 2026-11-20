@@ -949,7 +949,9 @@ class Build:
         self.tz = ZoneInfo(settings["timezone"])
         self.ref = ref_utc
         self.ref_ts = int(ref_utc.timestamp())
-        self.end_ts = self.ref_ts + int(settings["window_hours"] * 3600)
+        # scored window: from now to the end of tomorrow (Irish time); picks are chosen per day
+        last_day = ref_utc.astimezone(self.tz).date() + timedelta(days=1 + int(settings.get("days_ahead", 1)) - 1)
+        self.end_ts = int(datetime.combine(last_day + timedelta(days=1), datetime.min.time(), self.tz).timestamp())
         self.cov = {}
         self.notes = []
 
@@ -1489,6 +1491,30 @@ def rank_sections(preds, S):
                 p["sec"][key].update(rank=None, pick=False)
 
 
+def rank_by_day(games, S, tz):
+    """Top picks per Irish calendar day. Games carried over from the last list (already kicked off) keep their
+    pick and use up their place; the rest compete for the remaining places."""
+    days = defaultdict(list)
+    for g in games:
+        g["day"] = datetime.fromtimestamp(g["ts"], tz).date().isoformat()
+        days[g["day"]].append(g)
+    for group in days.values():
+        for key in SECTIONS:
+            listed = sorted([g for g in group if g["sec"][key].get("listed")], key=lambda g: (-g["sec"][key]["score"], g["ts"]))
+            used = sum(1 for g in listed if g.get("_carry") and g["sec"][key].get("pick"))
+            for r, g in enumerate(listed):
+                sec = g["sec"][key]
+                sec["rank"] = r + 1
+                if g.get("_carry"):
+                    continue
+                mn = S.get("_pass_intl", intl_pass_cfg(S)[0]) if g["intl"] else S["min_score"]
+                sec["pick"] = sec["score"] >= mn and used < S["top_n"]
+                used += sec["pick"]
+            for g in group:
+                if not g["sec"][key].get("listed"):
+                    g["sec"][key].update(rank=None, pick=False)
+
+
 def log_entry(p, result=None):
     return {"ts": p["ts"], "c": p["comp_no"], "cn": p["comp"], "i": p["intl"], "h": p["home"]["name"], "a": p["away"]["name"],
             "lh": p["raw"][0], "la": p["raw"][1], "lim": "limited_data" in p["tags"],
@@ -1851,6 +1877,21 @@ def main(argv=None):
         gh_output(ran="true" if prev else "false")
         return 1
 
+    # ---- picks per day; games from the last list that have kicked off since are kept as they were ----
+    old = load_json(DATA / "today.json", {}) or {}
+    new_ids = {p["fid"] for p in preds}
+    first_day = now_local.date().isoformat()
+    carry = []
+    for g in old.get("games", []):
+        if g["fid"] in new_ids or g["ts"] > build.ref_ts or "postponed" in g.get("tags", []):
+            continue
+        if datetime.fromtimestamp(g["ts"], tz).date().isoformat() >= first_day:
+            g["_carry"] = True
+            carry.append(g)
+    rank_by_day(preds + carry, settings, tz)
+    for g in carry:
+        g.pop("_carry", None)
+
     # ---- store today's predictions, settle earlier ones, learn from results ----
     for p in preds:
         plog.put(p["fid"], log_entry(p))
@@ -1918,7 +1959,8 @@ def main(argv=None):
         "ballon_min": settings["sections"]["ballon"]["min_favourite"],
         "misses_longest": settings["sections"]["misses"]["longest_price"],
         "goals_max": settings["sections"]["goals"]["max_chance_of_goal"],
-        "games": sorted(preds, key=lambda p: p["ts"]), "new_competitions": new_names,
+        "games": sorted(preds + carry, key=lambda p: p["ts"]), "new_competitions": new_names,
+        "days": sorted({g["day"] for g in preds + carry}),
     }
     # Results only: 3+ results in the last 21 days, all from games played since Goalscraper started watching, and
     # none of them listed beforehand (every run looks at today and tomorrow, so a listed game is always seen first).

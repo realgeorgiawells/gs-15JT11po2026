@@ -1,9 +1,10 @@
 # Goalscraper
 
-Every morning at 6:15 Irish time, Goalscraper rates each game in the next 24 hours, in your chosen competitions,
-for four sections, and publishes the picks as a phone app. At about 6 pm a short update brings in the results so
-far and marks postponed games. Every prediction and every result is kept, and the model checks itself against
-them each morning.
+Every morning at 6:15 Irish time, Goalscraper rates today's and tomorrow's games in your chosen competitions for
+four sections and picks the best for each day. The phone app shows today's picks (games that have kicked off move to
+the bottom) and switches to tomorrow's at midnight. At about 6 pm a short update brings in the results so far and
+marks postponed games. Every prediction and every result is kept, and the model checks itself against them each
+morning.
 
 ## The four sections
 
