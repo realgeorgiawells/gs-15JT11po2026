@@ -245,8 +245,8 @@ class Store:
             return None
         season = str(m.get("season") or "")
         ht, at = m.get("homeTeam") or {}, m.get("awayTeam") or {}
-        hid = ht.get("id") or ("name:" + norm(ht.get("name")))
-        aid = at.get("id") or ("name:" + norm(at.get("name")))
+        hid = fix_team(mid, ht.get("id") or ("name:" + norm(ht.get("name"))))
+        aid = fix_team(mid, at.get("id") or ("name:" + norm(at.get("name"))))
         for t, tid in ((ht, hid), (at, aid)):
             prev = self.teams.get(tid, [None, None, None])
             home_comp = fix_comp(mid, t.get("competitionId")) or prev[1]
@@ -286,7 +286,16 @@ class Store:
 # Fixes for OpenFootAPI's results-only ("fd") feed, which files some leagues under the wrong competition
 # (e.g. England's National League under "LigaPro (Ecuador)" and "World Cup"). Set in settings.json.
 # ----------------------------------------------------------------------------------------------
-FEED_FIXES = {"remap": {}, "drop": set()}
+FEED_FIXES = {"remap": {}, "drop": set(), "teams": {}}
+
+
+def fix_team(mid, tid):
+    """Same club, different id in a mislabelled copy (e.g. team_southend_worl -> team_southend_ecua)."""
+    if str(mid).startswith("match_fd_"):
+        for old, new in FEED_FIXES["teams"].items():
+            if str(tid).endswith(old):
+                return str(tid)[: -len(old)] + new
+    return tid
 
 
 def fix_comp(mid, comp):
@@ -303,34 +312,55 @@ def apply_feed_fixes(store, archive):
     if not FEED_FIXES["remap"] and not FEED_FIXES["drop"]:
         return 0
     n = 0
+
+    def fixed(mid, comp, h, a):
+        return fix_comp(mid, comp), fix_team(mid, h), fix_team(mid, a)
+
+    keys = {(v[0], v[2] // 86400, v[3], v[4]) for k, v in store.matches.items() if fixed(k, v[0], v[3], v[4]) == (v[0], v[3], v[4])}
     for mid in list(store.matches):
         v = store.matches[mid]
-        new = fix_comp(mid, v[0])
-        if new == v[0]:
+        new = fixed(mid, v[0], v[3], v[4])
+        if new == (v[0], v[3], v[4]):
             continue
-        if new is None or store.duplicate(mid, [new] + v[1:]):
+        key = (new[0], v[2] // 86400, new[1], new[2])
+        if new[0] is None or key in keys:
             del store.matches[mid]
         else:
-            v[0] = new
+            v[0], v[3], v[4] = new
+            keys.add(key)
         n += 1
-    for t in store.teams.values():
+    for tid in list(store.teams):
+        t = store.teams[tid]
         if t[1] in FEED_FIXES["remap"]:
             t[1] = FEED_FIXES["remap"][t[1]]
+        new = fix_team("match_fd_", tid)
+        if new != tid:
+            store.teams.setdefault(new, t)
+            del store.teams[tid]
     for month in archive.months_on_disk():
         rows = archive.load(month)
-        keys = {(r[0], r[2] // 86400, r[9], r[10]) for k, r in rows.items() if fix_comp(k, r[0]) == r[0]}
+        keys = {(r[0], r[2] // 86400, r[9], r[10]) for k, r in rows.items() if fixed(k, r[0], r[9], r[10]) == (r[0], r[9], r[10])}
         for mid in list(rows):
             r = rows[mid]
-            new = fix_comp(mid, r[0])
-            if new == r[0]:
+            new = fixed(mid, r[0], r[9], r[10])
+            if new == (r[0], r[9], r[10]):
                 continue
-            if new is None or (new, r[2] // 86400, r[9], r[10]) in keys:
+            key = (new[0], r[2] // 86400, new[1], new[2])
+            if new[0] is None or key in keys:
                 del rows[mid]
             else:
-                r[0] = new
-                keys.add((new, r[2] // 86400, r[9], r[10]))
+                r[0], r[9], r[10] = new
+                keys.add(key)
             archive.dirty.add(month)
             n += 1
+    tf = archive.folder / "teams.json"
+    teams = load_json(tf, {})
+    moved = {k: fix_team("match_fd_", k) for k in teams if fix_team("match_fd_", k) != k}
+    if moved:
+        for old, new in moved.items():
+            teams.setdefault(new, teams[old])
+            del teams[old]
+        save_json(tf, teams)
     archive.save()
     return n
 
@@ -1752,6 +1782,7 @@ def main(argv=None):
     ff = settings.get("feed_fixes") or {}
     FEED_FIXES["remap"] = dict(ff.get("remap") or {})
     FEED_FIXES["drop"] = set(ff.get("drop") or [])
+    FEED_FIXES["teams"] = dict(ff.get("team_ids") or {})
     fixed = apply_feed_fixes(store, archive)
     if fixed:
         print(f"  feed fixes: {fixed} mislabelled results moved or removed")
