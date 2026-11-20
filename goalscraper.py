@@ -1492,7 +1492,7 @@ def rank_sections(preds, S):
 
 
 def rank_by_day(games, S, tz):
-    """Top picks per Irish calendar day. Games carried over from the last list (already kicked off) keep their
+    """Top picks per Irish calendar day (exceptional scores can go past the top 10). Games carried over from the last list (already kicked off) keep their
     pick and use up their place; the rest compete for the remaining places."""
     days = defaultdict(list)
     for g in games:
@@ -1508,7 +1508,10 @@ def rank_by_day(games, S, tz):
                 if g.get("_carry"):
                     continue
                 mn = S.get("_pass_intl", intl_pass_cfg(S)[0]) if g["intl"] else S["min_score"]
-                sec["pick"] = sec["score"] >= mn and used < S["top_n"]
+                exc = S["sections"][key].get("exceptional", 101)
+                sec["exceptional"] = sec["score"] >= exc
+                # top 10, plus any exceptional game beyond that (up to max_picks a day)
+                sec["pick"] = sec["score"] >= mn and (used < S["top_n"] or (sec["exceptional"] and used < S.get("max_picks", S["top_n"])))
                 used += sec["pick"]
             for g in group:
                 if not g["sec"][key].get("listed"):
@@ -1956,6 +1959,8 @@ def main(argv=None):
         "app": "Goalscraper", "generated_utc": gen, "source": "OpenFootAPI", "plan": api.plan,
         "window_start_ts": build.ref_ts, "window_end_ts": build.end_ts, "timezone": settings["timezone"],
         "top_n": settings["top_n"], "min_club": settings["min_score"], "min_intl": used_pass, "min_intl_end": i_end,
+        "exceptional": {k: v.get("exceptional") for k, v in settings["sections"].items() if isinstance(v, dict)},
+        "max_picks": settings.get("max_picks", settings["top_n"]),
         "ballon_min": settings["sections"]["ballon"]["min_favourite"],
         "misses_longest": settings["sections"]["misses"]["longest_price"],
         "goals_max": settings["sections"]["goals"]["max_chance_of_goal"],
