@@ -262,7 +262,7 @@ const SEC = {
 };
 /* the app shows one Irish day at a time: today's picks, switching to the next day at midnight */
 const gameDay = g => g.day || new Intl.DateTimeFormat("en-CA", {timeZone: TZ}).format(new Date(g.ts * 1000));
-const today = () => new Intl.DateTimeFormat("en-CA", {timeZone: TZ}).format(new Date());
+const today = () => new Intl.DateTimeFormat("en-CA", {timeZone: TZ}).format(new Date(Date.now() + 10 * 60000));   // next day's picks from 23:50
 const dayGames = () => D.games.filter(g => gameDay(g) === today());
 const todayName = () => new Intl.DateTimeFormat("en-IE", {timeZone: "UTC", weekday: "long", day: "numeric", month: "long"}).format(new Date(today() + "T12:00:00Z"));
 const kicked = g => g.ts <= now() || g.tags.includes("postponed") || !!g.result;
@@ -344,7 +344,7 @@ function sectionView(key){
   let h = `<div class="sh"><h2>${S.name}</h2><p>${S.blurb()}</p>
     <div class="meta">${todayName()} · ${all.length} pick${all.length === 1 ? "" : "s"}${done.length ? ` (${done.length} kicked off)` : ""} · minimum score ${passOf(key)[0]} (internationals ${passOf(key)[1]}${passOf(key)[1] < passOf(key)[2] ? `, rising to ${passOf(key)[2]}` : ""}) · tap a game for details</div></div>`;
   if (!all.length) h += `<div class="note"><b>NO PICKS TODAY</b> &nbsp;No games today reached the minimum score.</div>`;
-  else if (!list.length) h += `<div class="note"><b>ALL KICKED OFF</b> &nbsp;Today's picks have all started; they're below. Tomorrow's appear at midnight.</div>`;
+  else if (!list.length) h += `<div class="note"><b>ALL KICKED OFF</b> &nbsp;Today's picks have all started; they're below. Tomorrow's appear at 23:50.</div>`;
   else h += `<div class="panel">${list.map(g => pickRow(g, key)).join("")}</div>`;
   const exc = all.filter(g => g.sec[key].exceptional).length;
   if (all.length > D.top_n) h += `<div class="note"><b>EXCEPTIONAL DAY</b> &nbsp;${exc} game${exc === 1 ? "" : "s"} scored ${(D.exceptional || {})[key]} or more, so the list goes past ${D.top_n}.</div>`;
@@ -384,7 +384,7 @@ function selectedView(){
       <div class="g">${esc(n.home.name)} v ${esc(n.away.name)}</div><div class="m">${tm(n.ts)} · ${esc(n.comp)}</div></div>`;
   }
   h += `<div class="sh" style="padding-top:14px"><div class="meta">${up.length} to come · ${st.length} already started${st.some(x => x.g.tags.includes("postponed")) ? " or postponed" : ""}${D.updated_utc ? ` · results updated ${tm(Date.parse(D.updated_utc) / 1000)}` : ""}</div></div>`;
-  h += up.length ? `<div class="panel">${up.map(selRow).join("")}</div>` : all.length ? `<div class="note"><b>ALL STARTED</b> &nbsp;Every selected game today has kicked off. Tomorrow's appear at midnight.</div>` : `<div class="note"><b>NO PICKS TODAY</b></div>`;
+  h += up.length ? `<div class="panel">${up.map(selRow).join("")}</div>` : all.length ? `<div class="note"><b>ALL STARTED</b> &nbsp;Every selected game today has kicked off. Tomorrow's appear at 23:50.</div>` : `<div class="note"><b>NO PICKS TODAY</b></div>`;
   if (st.length) {
     h += `<button class="fold ${foldOpen ? "open" : ""}" id="fold"><span>ALREADY STARTED${st.some(x => x.g.tags.includes("postponed")) ? " / POSTPONED" : ""} (${st.length})</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
     if (foldOpen) h += `<div class="panel" style="margin-top:8px">${st.map(selRow).join("")}</div>`;
@@ -620,7 +620,7 @@ function howView(){
     <h3>Raining Goals</h3>Goes wrong if either team fails to score.
     <h3>Team strength</h3>Attack and defence ratings come from every result, adjusted for the opponent and the league, and update every morning. Recent form counts a little extra. National teams use three years of internationals.
     <h3>Learning from results</h3>Every prediction is stored and checked against what happened. Each morning, settings are nudged where the evidence shows the forecasts are off, separately for clubs and internationals. Changes are listed on the Coverage screen.
-    <h3>Updates</h3>The list is made at 6:15 each morning. It scores today's games and tomorrow's, and picks the best games for each day; the app shows today's, with games that have kicked off moved to the bottom, and switches to tomorrow's at midnight (they're refreshed again at 6:15). At about 6 pm a short update marks postponed games and adds the results so far; it never changes picks or scores.
+    <h3>Updates</h3>The list is made at 6:15 each morning. It scores today's games and tomorrow's, and picks the best games for each day; the app shows today's, with games that have kicked off moved to the bottom, and switches to tomorrow's at 23:50 (they're refreshed again at 6:15). At about 6 pm a short update marks postponed games and adds the results so far; it never changes picks or scores.
     <h3>Results only</h3>Some competitions on OpenFootAPI only get results after the games are played, never the games beforehand. For most of them (Scotland, Portugal, Brazil, MLS and others) Goalscraper takes the upcoming games from TheSportsDB instead, matching both teams strictly; a game it can't match is skipped and listed under Notes on Coverage. Their picks settle when OpenFootAPI adds the results, which can take a few days. Any others can't be scored. Coverage labels them "Results only" (after two weeks of watching), and the label goes as soon as OpenFootAPI lists their games in advance. Their results still feed the team ratings. Every Monday, Goalscraper also looks back 14 days for results that were added late.
     <h3>International pass mark</h3>Internationals start with a lower pass mark because national teams play few games, which keeps their scores lower. It rises 1 point for every 50 international games Goalscraper has predicted and settled, up to the club mark, and pauses while the model check flags internationals.
     <h3>Record</h3>Each section's tab shows its hit rate over the last 30 days and all time, how each score band and competition has done, and every settled pick by day. All results holds every result stored, with Goalscraper's scores for the games it rated, and the model check: forecast against actual for each competition, flagged when the gap is too big to be bad luck.

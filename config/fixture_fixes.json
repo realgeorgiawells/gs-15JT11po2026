@@ -1,0 +1,7 @@
+{
+ "_about": "Games TheSportsDB lists on the wrong date. Give the right kickoff (UTC) or \"skip\": true. The game is then only scored on its real day, and any pick made for the wrong day is removed.",
+ "tsdb_2488814": {
+  "kickoff": "2026-11-23T19:45:00+00:00",
+  "note": "Nantes v Grenoble (Ligue 2) is on Mon 23 Nov, not Fri 20 Nov"
+ }
+}

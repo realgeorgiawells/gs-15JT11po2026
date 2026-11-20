@@ -951,6 +951,7 @@ class Build:
         self.catchup_days = 0       # weekly catch-up: look this many days back for results added late
         self.tsdb = None            # SportsDB client (upcoming games where OpenFootAPI only has results)
         self.tsdb_aliases = {}
+        self.fixture_fixes = {}     # config/fixture_fixes.json: wrong dates in TheSportsDB, corrected by hand
         self.tsdb_used, self.tsdb_skipped, self.tsdb_leagues = Counter(), [], {}
         self.other = comp_doc["other_league_strength"]
         self.confed = comp_doc["confederation_strength"]
@@ -1084,8 +1085,16 @@ class Build:
                 if (hid, aid) in listed:
                     continue                               # OpenFootAPI lists it itself now
                 rnd = f"Round {e['intRound']}" if str(e.get("intRound") or "").isdigit() else ""
-                self.store.matches[f"tsdb_{e.get('idEvent')}"] = [cid, self.guess_season(cid), tsdb_time(e), hid, aid,
-                                                                  None, None, "scheduled", rnd, True]
+                mid, ts = f"tsdb_{e.get('idEvent')}", tsdb_time(e)
+                fix = self.fixture_fixes.get(mid) or {}
+                if fix.get("skip"):
+                    continue
+                if fix.get("kickoff"):
+                    ts = int(datetime.fromisoformat(fix["kickoff"]).timestamp())
+                    if not (self.ref_ts <= ts < self.end_ts):
+                        self.store.matches.pop(mid, None)
+                        continue
+                self.store.matches[mid] = [cid, self.guess_season(cid), ts, hid, aid, None, None, "scheduled", rnd, True]
                 self.tsdb_used[c["no"]] += 1
 
     def team_games(self, tid, since_ts):
@@ -1814,6 +1823,7 @@ def main(argv=None):
         else:
             build.tsdb = SportsDB(os.environ.get("THESPORTSDB_KEY") or tcfg.get("key", "123"), tcfg.get("seconds_between_requests", 3.0))
         build.tsdb_aliases = load_json(CONFIG / "team_aliases.json", {})
+    build.fixture_fixes = {k: v for k, v in load_json(CONFIG / "fixture_fixes.json", {}).items() if not k.startswith("_")}
     if not store.matches and not first_archive:
         n = archive.rebuild_store(store, build.ref_ts - 500 * 86400, build.ref_ts - 1200 * 86400)
         print(f"  saved results were missing (GitHub's cache was empty): rebuilt {n} from the archive")
@@ -1891,11 +1901,19 @@ def main(argv=None):
 
     # ---- picks per day; games from the last list that have kicked off since are kept as they were ----
     old = load_json(DATA / "today.json", {}) or {}
+    for fid, fix in build.fixture_fixes.items():
+        if fix.get("skip") or fix.get("kickoff"):
+            right = None if fix.get("skip") else int(datetime.fromisoformat(fix["kickoff"]).timestamp())
+            for m in [plog.load(plog.month_of(build.ref_ts - 86400 * k)) for k in (0, 15, 31)]:
+                e = m.get(fid)
+                if e and (right is None or abs(e["ts"] - right) > 6 * 3600) and e.get("r") is None:
+                    m.pop(fid)
+                    plog.dirty.update(k for k, v in plog.months.items() if v is m)
     new_ids = {p["fid"] for p in preds}
     first_day = now_local.date().isoformat()
     carry = []
     for g in old.get("games", []):
-        if g["fid"] in new_ids or g["ts"] > build.ref_ts or "postponed" in g.get("tags", []):
+        if g["fid"] in new_ids or g["ts"] > build.ref_ts or "postponed" in g.get("tags", []) or g["fid"] in build.fixture_fixes:
             continue
         if datetime.fromtimestamp(g["ts"], tz).date().isoformat() >= first_day:
             g["_carry"] = True
