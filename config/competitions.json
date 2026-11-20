@@ -1197,7 +1197,8 @@
    "kind": "league",
    "country": "Northern Ireland",
    "strength": 36,
-   "openfoot_id": "comp_premiership_nir"
+   "openfoot_id": "comp_premiership_nir",
+   "picks": false
   },
   {
    "no": 86,
@@ -1209,7 +1210,8 @@
    "kind": "league",
    "country": "Wales",
    "strength": 34,
-   "openfoot_id": "comp_cymru_premier_wal"
+   "openfoot_id": "comp_cymru_premier_wal",
+   "picks": false
   }
  ],
  "other_league_strength": {
