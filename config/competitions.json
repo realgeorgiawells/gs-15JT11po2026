@@ -65,16 +65,9 @@
    "kind": "league",
    "country": "England",
    "strength": 44,
-   "openfoot_id": null,
-   "watch": {
-    "name_patterns": [
-     "^national league$"
-    ],
-    "where": [
-     "england",
-     "_eng"
-    ]
-   }
+   "openfoot_id": "comp_ligapro_ecu",
+   "tsdb_id": 4590,
+   "_note": "OpenFootAPI files National League results under 'comp_ligapro_ecu' (LigaPro Ecuador) in its results-only feed."
   },
   {
    "no": 6,
@@ -1019,8 +1012,8 @@
    "kind": "league",
    "country": "Ecuador",
    "strength": 62,
-   "openfoot_id": "comp_ligapro_ecu",
-   "tsdb_id": 4686
+   "openfoot_id": null,
+   "_note": "Not really on OpenFootAPI: its id held another league's results (National League / Spanish Segunda)."
   },
   {
    "no": 71,
@@ -1107,7 +1100,8 @@
    "kind": "league",
    "country": "Portugal",
    "strength": 58,
-   "openfoot_id": "comp_segunda_liga_pt"
+   "openfoot_id": null,
+   "_note": "Not really on OpenFootAPI: its id held another league's results (National League / Spanish Segunda)."
   },
   {
    "no": 78,

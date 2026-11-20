@@ -71,5 +71,15 @@
   "enabled": true,
   "key": "123",
   "seconds_between_requests": 3.0
+ },
+ "feed_fixes": {
+  "_about": "OpenFootAPI's results-only feed files some leagues under the wrong competition. remap moves them to the right one; drop ignores copies of leagues already kept elsewhere. Only affects that feed (ids starting match_fd_).",
+  "remap": {
+   "comp_fifa_world_cup": "comp_ligapro_ecu"
+  },
+  "drop": [
+   "comp_j2_league_jpn",
+   "comp_segunda_liga_pt"
+  ]
  }
 }

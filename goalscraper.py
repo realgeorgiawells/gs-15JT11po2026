@@ -240,14 +240,16 @@ class Store:
         mid = m.get("id")
         if not mid:
             return None
-        comp = m.get("competitionId") or ""
+        comp = fix_comp(mid, m.get("competitionId") or "")
+        if comp is None:
+            return None
         season = str(m.get("season") or "")
         ht, at = m.get("homeTeam") or {}, m.get("awayTeam") or {}
         hid = ht.get("id") or ("name:" + norm(ht.get("name")))
         aid = at.get("id") or ("name:" + norm(at.get("name")))
         for t, tid in ((ht, hid), (at, aid)):
             prev = self.teams.get(tid, [None, None, None])
-            home_comp = t.get("competitionId") or prev[1]
+            home_comp = fix_comp(mid, t.get("competitionId")) or prev[1]
             if home_comp and self.is_cup(home_comp) and prev[1] and not self.is_cup(prev[1]):
                 home_comp = prev[1]
             self.teams[tid] = [t.get("name") or prev[0], home_comp, t.get("country") or prev[2]]
@@ -255,6 +257,8 @@ class Store:
         status = norm(m.get("status"))
         rec = [comp, season, to_ts(m["kickoffAt"]), hid, aid, sc.get("home"), sc.get("away"), status,
                m.get("round") or "", bool(m.get("kickoffTimeKnown", True))]
+        if comp != (m.get("competitionId") or "") and self.duplicate(mid, rec):
+            return None
         self.matches[mid] = rec
         if comp and status in ("scheduled", "unknown", "") and rec[2] > time.time():
             self.upcoming[comp] = datetime.now(timezone.utc).date().isoformat()
@@ -264,12 +268,71 @@ class Store:
                 self.seasons[comp] = season
         return mid
 
+    def duplicate(self, mid, rec):
+        """A relabelled game that the store already has under its proper competition."""
+        day = rec[2] // 86400
+        return any(k != mid and v[0] == rec[0] and v[3] == rec[3] and v[4] == rec[4] and v[2] // 86400 == day
+                   for k, v in self.matches.items())
+
     def comp_name(self, cid):
         return (self.comps.get(cid) or {}).get("name") or cid if cid != "_fetched" else cid
 
     def is_cup(self, cid):
         n = norm(self.comp_name(cid)) + " " + norm(cid.replace("_", " "))
         return any(w in n for w in CUP_WORDS)
+
+
+# ----------------------------------------------------------------------------------------------
+# Fixes for OpenFootAPI's results-only ("fd") feed, which files some leagues under the wrong competition
+# (e.g. England's National League under "LigaPro (Ecuador)" and "World Cup"). Set in settings.json.
+# ----------------------------------------------------------------------------------------------
+FEED_FIXES = {"remap": {}, "drop": set()}
+
+
+def fix_comp(mid, comp):
+    """The right competition for a game, or None to ignore it."""
+    if comp and str(mid).startswith("match_fd_"):
+        if comp in FEED_FIXES["drop"]:
+            return None
+        return FEED_FIXES["remap"].get(comp, comp)
+    return comp
+
+
+def apply_feed_fixes(store, archive):
+    """Apply the fixes to what is already saved (store and archive). Mislabelled copies are removed."""
+    if not FEED_FIXES["remap"] and not FEED_FIXES["drop"]:
+        return 0
+    n = 0
+    for mid in list(store.matches):
+        v = store.matches[mid]
+        new = fix_comp(mid, v[0])
+        if new == v[0]:
+            continue
+        if new is None or store.duplicate(mid, [new] + v[1:]):
+            del store.matches[mid]
+        else:
+            v[0] = new
+        n += 1
+    for t in store.teams.values():
+        if t[1] in FEED_FIXES["remap"]:
+            t[1] = FEED_FIXES["remap"][t[1]]
+    for month in archive.months_on_disk():
+        rows = archive.load(month)
+        keys = {(r[0], r[2] // 86400, r[9], r[10]) for k, r in rows.items() if fix_comp(k, r[0]) == r[0]}
+        for mid in list(rows):
+            r = rows[mid]
+            new = fix_comp(mid, r[0])
+            if new == r[0]:
+                continue
+            if new is None or (new, r[2] // 86400, r[9], r[10]) in keys:
+                del rows[mid]
+            else:
+                r[0] = new
+                keys.add((new, r[2] // 86400, r[9], r[10]))
+            archive.dirty.add(month)
+            n += 1
+    archive.save()
+    return n
 
 
 # ----------------------------------------------------------------------------------------------
@@ -1686,6 +1749,12 @@ def main(argv=None):
     if not store.matches and not first_archive:
         n = archive.rebuild_store(store, build.ref_ts - 500 * 86400, build.ref_ts - 1200 * 86400)
         print(f"  saved results were missing (GitHub's cache was empty): rebuilt {n} from the archive")
+    ff = settings.get("feed_fixes") or {}
+    FEED_FIXES["remap"] = dict(ff.get("remap") or {})
+    FEED_FIXES["drop"] = set(ff.get("drop") or [])
+    fixed = apply_feed_fixes(store, archive)
+    if fixed:
+        print(f"  feed fixes: {fixed} mislabelled results moved or removed")
     archive.merge_upcoming(store)
     plog = PredLog(DATA / "log")
     plog.load_all()
