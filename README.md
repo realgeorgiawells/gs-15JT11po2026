@@ -10,7 +10,7 @@ morning.
 
 | Section | A pick goes wrong if… | Rules |
 | --- | --- | --- |
-| Easy Goals | the game ends 0-0 | games over 97% likely to have a goal are too short to be picks |
+| Easy Goals | the game ends 0-0 | games over 98% likely to have a goal are too short to be picks |
 | Misses | the team wins | underdogs no longer than 25/1, in games without an 80%+ favourite |
 | Ballon d'Or | the team doesn't win | favourites at 80% or more |
 | Raining Goals | either team fails to score | — |

@@ -16,7 +16,7 @@
  "sections": {
   "_about": "Each section's 1-100 scale is set by the chance of the pick going wrong: 'fail_at_100' scores 100, 'fail_at_50' scores 50 (the pass mark), 'fail_at_1' scores 1. Easy Goals goes wrong on a 0-0; Misses if the team wins; Ballon d'Or if the team doesn't win; Raining Goals if either team fails to score.",
   "goals": {
-   "max_chance_of_goal": 0.97,
+   "max_chance_of_goal": 0.98,
    "fail_at_100": 0.03,
    "fail_at_50": 0.065,
    "fail_at_1": 0.3,

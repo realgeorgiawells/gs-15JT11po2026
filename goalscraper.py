@@ -1518,7 +1518,9 @@ def rank_by_day(games, S, tz):
         days[g["day"]].append(g)
     for group in days.values():
         for key in SECTIONS:
-            listed = sorted([g for g in group if g["sec"][key].get("listed")], key=lambda g: (-g["sec"][key]["score"], g["ts"]))
+            # ties (several games at 100) are broken by the actual chance, then kickoff
+            listed = sorted([g for g in group if g["sec"][key].get("listed")],
+                            key=lambda g: (-g["sec"][key]["score"], -(g["sec"][key].get("p") or 0), g["ts"]))
             used = sum(1 for g in listed if g.get("_carry") and g["sec"][key].get("pick"))
             for r, g in enumerate(listed):
                 sec = g["sec"][key]
