@@ -1531,7 +1531,7 @@ def rank_by_day(games, S, tz):
                 exc = S["sections"][key].get("exceptional", 101)
                 sec["exceptional"] = sec["score"] >= exc
                 # top 10, plus any exceptional game beyond that (up to max_picks a day)
-                sec["pick"] = sec["score"] >= mn and (used < S["top_n"] or (sec["exceptional"] and used < S.get("max_picks", S["top_n"])))
+                sec["pick"] = sec["score"] >= mn and (used < S["top_n"] or (sec["exceptional"] and used < S["sections"][key].get("max_picks", S.get("max_picks", S["top_n"]))))
                 used += sec["pick"]
             for g in group:
                 if not g["sec"][key].get("listed"):
@@ -1990,7 +1990,7 @@ def main(argv=None):
         "top_n": settings["top_n"], "min_club": settings["min_score"], "min_intl": used_pass, "min_intl_end": i_end,
         "pass": {k: list(pass_marks(settings, k)) + [settings["sections"][k].get("min_score", settings["min_score"])] for k in SECTIONS},
         "exceptional": {k: v.get("exceptional") for k, v in settings["sections"].items() if isinstance(v, dict)},
-        "max_picks": settings.get("max_picks", settings["top_n"]),
+        "max_picks": {k: settings["sections"][k].get("max_picks", settings.get("max_picks", settings["top_n"])) for k in SECTIONS},
         "ballon_min": settings["sections"]["ballon"]["min_favourite"],
         "misses_longest": settings["sections"]["misses"]["longest_price"],
         "goals_max": settings["sections"]["goals"]["max_chance_of_goal"],

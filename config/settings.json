@@ -21,7 +21,8 @@
    "fail_at_50": 0.065,
    "fail_at_1": 0.3,
    "exceptional": 82.5,
-   "min_score": 65
+   "min_score": 65,
+   "max_picks": 20
   },
   "misses": {
    "longest_price": 25,
