@@ -16,13 +16,27 @@
   "Atlético Mineiro": "Atletico-MG"
  },
  "65": {
-  "Gimnasia y Esgrima de La Plata": "Gimnasia L.P."
+  "Gimnasia y Esgrima de La Plata": "Gimnasia L.P.",
+  "Gimnasia y Esgrima de Mendoza": "Gimnasia Mendoza"
  },
  "66": {
-  "Pumas UNAM": "U.N.A.M.- Pumas",
+  "Pumas UNAM": "UNAM Pumas",
   "Atletico de San Luis": "Atl. San Luis"
  },
  "55": {
-  "Hamarkameratene": "HamKam"
+  "Hamarkameratene": "HamKam",
+  "KFUM-Kameratene Oslo": "KFUM Oslo"
+ },
+ "18": {
+  "AEK Athens": "AEK",
+  "OFI": "OFI Crete"
+ },
+ "58": {
+  "Zagłębie Lubin": "Zaglebie",
+  "Wisła Kraków": "Wisla",
+  "Raków Częstochowa": "Rakow"
+ },
+ "75": {
+  "Sporting de Gijón": "Sp Gijon"
  }
 }
