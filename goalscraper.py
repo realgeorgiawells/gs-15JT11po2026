@@ -699,7 +699,7 @@ def section_scores(p, S):
     dog = "away" if fav == "home" else "home"
     pf, pd = (p["w"], p["l"]) if fav == "home" else (p["l"], p["w"])
     b, m = sec["ballon"], sec["misses"]
-    out["ballon"] = {"listed": pf >= b["min_favourite"], "team": fav, "p": pf,
+    out["ballon"] = {"listed": pf >= (b.get("min_favourite") or 0), "team": fav, "p": pf,   # the pass mark decides
                      "score": sc(1 - pf, "ballon")}
     # Misses: any game, unless it's a Ballon d'Or pick (that check happens when ranking)
     out["misses"] = {"listed": not m.get("longest_price") or pd >= 1 / (m["longest_price"] + 1), "team": dog, "p": 1 - pd,
@@ -2002,7 +2002,7 @@ def main(argv=None):
         "pass": {k: list(pass_marks(settings, k)) + [settings["sections"][k].get("min_score", settings["min_score"])] for k in SECTIONS},
         "exceptional": {k: v.get("exceptional") for k, v in settings["sections"].items() if isinstance(v, dict)},
         "max_picks": {k: settings["sections"][k].get("max_picks", settings.get("max_picks")) for k in SECTIONS},
-        "ballon_min": settings["sections"]["ballon"]["min_favourite"],
+        "ballon_min": settings["sections"]["ballon"].get("min_favourite"),
         "misses_longest": settings["sections"]["misses"].get("longest_price"),
         "goals_max": settings["sections"]["goals"].get("max_chance_of_goal"),
         "games": sorted(preds + carry, key=lambda p: p["ts"]), "new_competitions": new_names,

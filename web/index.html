@@ -255,7 +255,7 @@ const SEC = {
            fig: g => [pct(1 - g.p00, 1), "1+ goals"]},
   misses: {name: "Misses",       blurb: () => `Teams most likely not to win (lose or draw). Any game except Ballon d'Or picks.`,
            fig: g => [pct(g.sec.misses.p, 0), "not to win"]},
-  ballon: {name: "Ballon d'Or",  blurb: () => `Clear favourites (${Math.round(D.ballon_min * 100)}% or more to win), most likely first.`,
+  ballon: {name: "Ballon d'Or",  blurb: () => `Teams to win, most likely first. A score of 65 is about an 84% chance.`,
            fig: g => [pct(g.sec.ballon.p, 0), "to win"]},
   btts:   {name: "Raining Goals",blurb: () => "Games most likely to see both teams score.",
            fig: g => [pct(g.p_btts, 0), "both score"]},
@@ -614,7 +614,7 @@ function howView(){
     <div class="sh"><h2>How it works</h2></div><div class="panel prose">
     <h3>The score</h3>Every pick gets a score from 1 to 100 for how unlikely it is to go wrong, on its own section's scale. It isn't a percentage. A game becomes a pick at its section's minimum score: ${D.pass ? `${D.pass.goals[0]} for Easy Goals, Misses and Raining Goals, ${D.pass.ballon[0]} for Ballon d'Or` : D.min_club} (internationals a little lower while their results build up). Every game over the mark is a pick, however many that is, and lists are never padded. Next best shows the games just under it.
     <h3>Easy Goals</h3>Goes wrong on a 0-0. A game 97% or more likely to have a goal scores 100; ties at 100 are ranked by the actual chance.
-    <h3>Misses and Ballon d'Or</h3>A game goes on only one of the two. Ballon d'Or takes clear favourites (${Math.round(D.ballon_min * 100)}% or more to win) that reach its pass mark. Every other game can go in Misses, including strong favourites that just missed Ballon d'Or, where a 3/1 underdog scores about 50 and a 25/1 underdog 100.
+    <h3>Misses and Ballon d'Or</h3>A game goes on only one of the two. Ballon d'Or takes the favourite in any game that reaches its pass mark (50 is an 80% chance to win, 65 about 84%, 90 about 88.5%). Every other game can go in Misses, including strong favourites that just missed Ballon d'Or, where a 3/1 underdog scores about 50 and a 25/1 underdog 100.
     <h3>Raining Goals</h3>Goes wrong if either team fails to score.
     <h3>Team strength</h3>Attack and defence ratings come from every result, adjusted for the opponent and the league, and update every morning. Recent form counts a little extra. National teams use three years of internationals.
     <h3>Learning from results</h3>Every prediction is stored and checked against what happened. Each morning, settings are nudged where the evidence shows the forecasts are off, separately for clubs and internationals. Changes are listed on the Coverage screen.
