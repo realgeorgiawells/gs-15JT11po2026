@@ -701,7 +701,8 @@ def section_scores(p, S):
     b, m = sec["ballon"], sec["misses"]
     out["ballon"] = {"listed": pf >= b["min_favourite"], "team": fav, "p": pf,
                      "score": sc(1 - pf, "ballon")}
-    out["misses"] = {"listed": pf < b["min_favourite"] and (not m.get("longest_price") or pd >= 1 / (m["longest_price"] + 1)), "team": dog, "p": 1 - pd,
+    # Misses: any game, unless it's a Ballon d'Or pick (that check happens when ranking)
+    out["misses"] = {"listed": not m.get("longest_price") or pd >= 1 / (m["longest_price"] + 1), "team": dog, "p": 1 - pd,
                      "score": sc(pd, "misses")}
     t = sec["btts"]
     out["btts"] = {"listed": True, "score": sc(1 - p["btts"], "btts"), "p": p["btts"]}
@@ -1494,9 +1495,17 @@ class Build:
             cal.note("League strengths nudged by cross-league results: " + ", ".join(moved[:5]) + ".")
 
 
+RANK_ORDER = ("goals", "ballon", "misses", "btts")    # Ballon d'Or first: its picks can't also be Misses
+
+
+def eligible(g, key):
+    s = g["sec"]
+    return bool(s[key].get("listed")) and not (key == "misses" and s["ballon"].get("pick"))
+
+
 def rank_sections(preds, S):
-    for key in SECTIONS:
-        cand = sorted([p for p in preds if p["sec"][key]["listed"]], key=lambda p: (-p["sec"][key]["score"], p["ts"]))
+    for key in RANK_ORDER:
+        cand = sorted([p for p in preds if eligible(p, key)], key=lambda p: (-p["sec"][key]["score"], p["ts"]))
         n = 0
         for r, p in enumerate(cand):
             s = p["sec"][key]
@@ -1505,7 +1514,7 @@ def rank_sections(preds, S):
             s["pick"] = s["score"] >= mn and n < (S.get("top_n") or 10**6)
             n += s["pick"]
         for p in preds:
-            if not p["sec"][key]["listed"]:
+            if not eligible(p, key):
                 p["sec"][key].update(rank=None, pick=False)
 
 
@@ -1517,9 +1526,9 @@ def rank_by_day(games, S, tz):
         g["day"] = datetime.fromtimestamp(g["ts"], tz).date().isoformat()
         days[g["day"]].append(g)
     for group in days.values():
-        for key in SECTIONS:
+        for key in RANK_ORDER:
             # ties (several games at 100) are broken by the actual chance, then kickoff
-            listed = sorted([g for g in group if g["sec"][key].get("listed")],
+            listed = sorted([g for g in group if eligible(g, key)],
                             key=lambda g: (-g["sec"][key]["score"], -(g["sec"][key].get("p") or 0), g["ts"]))
             used = sum(1 for g in listed if g.get("_carry") and g["sec"][key].get("pick"))
             for r, g in enumerate(listed):
@@ -1536,7 +1545,7 @@ def rank_by_day(games, S, tz):
                 sec["pick"] = sec["score"] >= mn and (used < limit or (sec["exceptional"] and used < cap))
                 used += sec["pick"]
             for g in group:
-                if not g["sec"][key].get("listed"):
+                if not eligible(g, key):
                     g["sec"][key].update(rank=None, pick=False)
 
 
