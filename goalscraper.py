@@ -693,7 +693,7 @@ def section_scores(p, S):
     sc = lambda f, k: scale_score(f, sec[k]["fail_at_100"], sec[k]["fail_at_50"], sec[k].get("fail_at_1", DEFAULT_AT1[k]), knot)
     out = {}
     g = sec["goals"]
-    out["goals"] = {"listed": (1 - p["p00"]) <= g["max_chance_of_goal"] + 1e-9,
+    out["goals"] = {"listed": (1 - p["p00"]) <= (g.get("max_chance_of_goal") or 1.0) + 1e-9,
                     "score": sc(p["p00"], "goals"), "p": 1 - p["p00"]}
     fav = "home" if p["w"] >= p["l"] else "away"
     dog = "away" if fav == "home" else "home"
@@ -701,7 +701,7 @@ def section_scores(p, S):
     b, m = sec["ballon"], sec["misses"]
     out["ballon"] = {"listed": pf >= b["min_favourite"], "team": fav, "p": pf,
                      "score": sc(1 - pf, "ballon")}
-    out["misses"] = {"listed": pf < b["min_favourite"] and pd >= 1 / (m["longest_price"] + 1), "team": dog, "p": 1 - pd,
+    out["misses"] = {"listed": pf < b["min_favourite"] and (not m.get("longest_price") or pd >= 1 / (m["longest_price"] + 1)), "team": dog, "p": 1 - pd,
                      "score": sc(pd, "misses")}
     t = sec["btts"]
     out["btts"] = {"listed": True, "score": sc(1 - p["btts"], "btts"), "p": p["btts"]}
@@ -1502,7 +1502,7 @@ def rank_sections(preds, S):
             s = p["sec"][key]
             s["rank"] = r + 1
             mn = pass_marks(S, key)[1 if p["intl"] else 0]
-            s["pick"] = s["score"] >= mn and n < S["top_n"]
+            s["pick"] = s["score"] >= mn and n < (S.get("top_n") or 10**6)
             n += s["pick"]
         for p in preds:
             if not p["sec"][key]["listed"]:
@@ -1530,8 +1530,10 @@ def rank_by_day(games, S, tz):
                 mn = pass_marks(S, key)[1 if g["intl"] else 0]
                 exc = S["sections"][key].get("exceptional", 101)
                 sec["exceptional"] = sec["score"] >= exc
-                # top 10, plus any exceptional game beyond that (up to max_picks a day)
-                sec["pick"] = sec["score"] >= mn and (used < S["top_n"] or (sec["exceptional"] and used < S["sections"][key].get("max_picks", S.get("max_picks", S["top_n"]))))
+                # every game over the pass mark is a pick (top_n / max_picks only apply if set)
+                limit = S.get("top_n") or 10**6
+                cap = S["sections"][key].get("max_picks", S.get("max_picks")) or limit
+                sec["pick"] = sec["score"] >= mn and (used < limit or (sec["exceptional"] and used < cap))
                 used += sec["pick"]
             for g in group:
                 if not g["sec"][key].get("listed"):
@@ -1987,13 +1989,13 @@ def main(argv=None):
     today = {
         "app": "Goalscraper", "generated_utc": gen, "source": "OpenFootAPI", "plan": api.plan,
         "window_start_ts": build.ref_ts, "window_end_ts": build.end_ts, "timezone": settings["timezone"],
-        "top_n": settings["top_n"], "min_club": settings["min_score"], "min_intl": used_pass, "min_intl_end": i_end,
+        "top_n": settings.get("top_n"), "min_club": settings["min_score"], "min_intl": used_pass, "min_intl_end": i_end,
         "pass": {k: list(pass_marks(settings, k)) + [settings["sections"][k].get("min_score", settings["min_score"])] for k in SECTIONS},
         "exceptional": {k: v.get("exceptional") for k, v in settings["sections"].items() if isinstance(v, dict)},
-        "max_picks": {k: settings["sections"][k].get("max_picks", settings.get("max_picks", settings["top_n"])) for k in SECTIONS},
+        "max_picks": {k: settings["sections"][k].get("max_picks", settings.get("max_picks")) for k in SECTIONS},
         "ballon_min": settings["sections"]["ballon"]["min_favourite"],
-        "misses_longest": settings["sections"]["misses"]["longest_price"],
-        "goals_max": settings["sections"]["goals"]["max_chance_of_goal"],
+        "misses_longest": settings["sections"]["misses"].get("longest_price"),
+        "goals_max": settings["sections"]["goals"].get("max_chance_of_goal"),
         "games": sorted(preds + carry, key=lambda p: p["ts"]), "new_competitions": new_names,
         "days": sorted({g["day"] for g in preds + carry}),
     }

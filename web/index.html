@@ -251,9 +251,9 @@ const ago = s => { const m = Math.floor(s / 60); return m < 60 ? `${m} min ago` 
 const odds = p => { const f = 1 / p - 1; return f >= 1 ? `${Math.round(f)}/1` : `1/${Math.round(1 / f)}`; };
 
 const SEC = {
-  goals:  {name: "Easy Goals",   blurb: () => `Games most likely to have at least one goal, but no shorter than ${Math.round(D.goals_max * 100)}%.`,
+  goals:  {name: "Easy Goals",   blurb: () => `Games most likely to have at least one goal.`,
            fig: g => [pct(1 - g.p00, 1), "1+ goals"]},
-  misses: {name: "Misses",       blurb: () => `Teams most likely not to win (lose or draw). Underdogs no longer than ${D.misses_longest}/1.`,
+  misses: {name: "Misses",       blurb: () => `Teams most likely not to win (lose or draw), in games without a clear favourite.`,
            fig: g => [pct(g.sec.misses.p, 0), "not to win"]},
   ballon: {name: "Ballon d'Or",  blurb: () => `Clear favourites (${Math.round(D.ballon_min * 100)}% or more to win), most likely first.`,
            fig: g => [pct(g.sec.ballon.p, 0), "to win"]},
@@ -330,7 +330,7 @@ function nextBest(key){
   let h = `<button class="fold ${nextOpen[key] ? "open" : ""}" data-next="${key}"><span>NEXT BEST (${rest.length})</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
   if (nextOpen[key]) {
     h += `<div class="panel dim" style="margin-top:8px">`;
-    if (passed.length) h += `<div class="gh">Passed the mark, outside the top ${D.top_n}</div>` + passed.map(g => pickRow(g, key)).join("");
+    if (passed.length) h += `<div class="gh">Passed the mark</div>` + passed.map(g => pickRow(g, key)).join("");
     if (below.length) h += `<div class="gh">Below the pass mark: not picks</div>` + below.map(g => pickRow(g, key)).join("");
     h += `</div>`;
   }
@@ -346,9 +346,7 @@ function sectionView(key){
   if (!all.length) h += `<div class="note"><b>NO PICKS TODAY</b> &nbsp;No games today reached the minimum score.</div>`;
   else if (!list.length) h += `<div class="note"><b>ALL KICKED OFF</b> &nbsp;Today's picks have all started; they're below. Tomorrow's appear at 23:50.</div>`;
   else h += `<div class="panel">${list.map(g => pickRow(g, key)).join("")}</div>`;
-  const exc = all.filter(g => g.sec[key].exceptional).length;
-  if (all.length > D.top_n) h += `<div class="note"><b>EXCEPTIONAL DAY</b> &nbsp;${exc} game${exc === 1 ? "" : "s"} scored ${(D.exceptional || {})[key]} or more, so the list goes past ${D.top_n}.</div>`;
-  if (all.length && all.length < D.top_n) h += `<div class="note"><b>ONLY ${all.length} PICK${all.length === 1 ? "" : "S"}</b> &nbsp;Only ${all.length} game${all.length === 1 ? "" : "s"} today reached the minimum score, so the list isn't padded with weaker ones.</div>`;
+
   h += nextBest(key);
   if (done.length) {
     h += `<button class="fold ${kickOpen[key] ? "open" : ""}" data-kick="${key}"><span>ALREADY KICKED OFF (${done.length})</span><svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></button>`;
@@ -614,9 +612,9 @@ function coverageView(){
 function howView(){
   return `<button class="back" data-back><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>BACK</button>
     <div class="sh"><h2>How it works</h2></div><div class="panel prose">
-    <h3>The score</h3>Every pick gets a score from 1 to 100 for how unlikely it is to go wrong, on its own section's scale. It isn't a percentage. A game becomes a pick at its section's minimum score: ${D.pass ? `${D.pass.goals[0]} for Easy Goals, Misses and Raining Goals, ${D.pass.ballon[0]} for Ballon d'Or` : D.min_club} (internationals a little lower while their results build up), up to ${D.top_n} per section. Fewer qualify on some days, and lists are never padded. Next best shows the rest.
-    <h3>Easy Goals</h3>Goes wrong on a 0-0. Games more than ${Math.round(D.goals_max * 100)}% likely to have a goal are too short to be picks; a game right at ${Math.round(D.goals_max * 100)}% scores 100.
-    <h3>Misses and Ballon d'Or</h3>A game goes on only one of the two. Ballon d'Or takes clear favourites (${Math.round(D.ballon_min * 100)}% or more to win). Every other game with an underdog no longer than ${D.misses_longest}/1 can go in Misses, where a 3/1 underdog scores about 50 and a ${D.misses_longest}/1 underdog 100.
+    <h3>The score</h3>Every pick gets a score from 1 to 100 for how unlikely it is to go wrong, on its own section's scale. It isn't a percentage. A game becomes a pick at its section's minimum score: ${D.pass ? `${D.pass.goals[0]} for Easy Goals, Misses and Raining Goals, ${D.pass.ballon[0]} for Ballon d'Or` : D.min_club} (internationals a little lower while their results build up). Every game over the mark is a pick, however many that is, and lists are never padded. Next best shows the games just under it.
+    <h3>Easy Goals</h3>Goes wrong on a 0-0. A game 97% or more likely to have a goal scores 100; ties at 100 are ranked by the actual chance.
+    <h3>Misses and Ballon d'Or</h3>A game goes on only one of the two. Ballon d'Or takes clear favourites (${Math.round(D.ballon_min * 100)}% or more to win). Every other game can go in Misses, where a 3/1 underdog scores about 50 and a 25/1 underdog 100.
     <h3>Raining Goals</h3>Goes wrong if either team fails to score.
     <h3>Team strength</h3>Attack and defence ratings come from every result, adjusted for the opponent and the league, and update every morning. Recent form counts a little extra. National teams use three years of internationals.
     <h3>Learning from results</h3>Every prediction is stored and checked against what happened. Each morning, settings are nudged where the evidence shows the forecasts are off, separately for clubs and internationals. Changes are listed on the Coverage screen.
@@ -625,7 +623,6 @@ function howView(){
     <h3>International pass mark</h3>Internationals start with a lower pass mark because national teams play few games, which keeps their scores lower. It rises 1 point for every 50 international games Goalscraper has predicted and settled, up to the club mark, and pauses while the model check flags internationals.
     <h3>Record</h3>Each section's tab shows its hit rate over the last 30 days and all time, how each score band and competition has done, and every settled pick by day. All results holds every result stored, with Goalscraper's scores for the games it rated, and the model check: forecast against actual for each competition, flagged when the gap is too big to be bad luck.
     <h3>By competition</h3>In the menu: for each competition, the best 5 Easy Goals and best 3 Raining Goals games of the day, ranked within that competition, whether or not they made the main lists. Games that are also section picks say PICK.
-    <h3>Exceptional days</h3>Each section shows up to 10 picks a day, but a game with an exceptional score (Easy Goals 82.5, Raining Goals 87.5, Misses and Ballon d'Or 82.5) is always a pick, up to 20 a day in Easy Goals and 15 in the others. They're marked ★.
     <h3>All games</h3>Each game shows its score in every section: EG = Easy Goals, BD = Ballon d'Or, MI = Misses, RG = Raining Goals.
     <h3>Reality check</h3>Scores are a ranking, not a guarantee. At short prices one losing pick can wipe out many winners. The Record screen shows how each section is really doing.</div>`;
 }
