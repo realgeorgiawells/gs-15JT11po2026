@@ -9,6 +9,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
         with: {python-version: "3.12"}
-      - env:
-          OPENFOOT_API_KEY: ${{ secrets.OPENFOOT_API_KEY }}
-        run: python tools/check_comp.py
+      - uses: actions/cache/restore@v5
+        with:
+          path: data/store.json
+          key: results-none
+          restore-keys: results-
+      - run: python tools/check_comp.py

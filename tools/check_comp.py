@@ -1,10 +1,11 @@
-import json, os, urllib.parse, urllib.request
-KEY = os.environ["OPENFOOT_API_KEY"].strip()
-def get(**p):
-    req = urllib.request.Request("https://openfootapi.com/v1/matches?" + urllib.parse.urlencode(p), headers={"Authorization": f"Bearer {KEY}"})
-    with urllib.request.urlopen(req, timeout=60) as r: return json.load(r)
-for cid, season in (("comp_laliga_es", "2026/27"), ("comp_laliga_es", "2025/26"), ("comp_premier_league_eng", "2026/27")):
-    d = get(competition=cid, season=season, status="finished")
-    ks = sorted(x.get("kickoffAt") or "" for x in d.get("data", []))
-    ids = {x["id"].split("_")[1] for x in d.get("data", [])}
-    print("CHECK", cid, season, "total", d["meta"].get("total_count"), "first page", ks[:1], ks[-1:], "feeds", ids, "next", bool(d["meta"].get("pagination", {}).get("next_cursor")), "left", d["meta"].get("access", {}).get("remaining"))
+import json, datetime as dt
+from collections import Counter
+s = json.load(open("data/store.json"))
+m = s["matches"]
+print("STORE matches", len(m), "backfilled", len(s["backfilled"]))
+bar = sorted((v for v in m.values() if any("barcelona" in str(x).lower() for x in (v[3], v[4]))), key=lambda v: v[2])
+print("STORE barca", len(bar))
+for v in bar: print("STORE  ", dt.datetime.fromtimestamp(v[2], dt.timezone.utc).date(), v[0], v[1], v[3], v[5], v[6], v[4], v[7])
+c = Counter((v[0], v[1]) for v in m.values() if v[0] in ("comp_laliga_es", "comp_premier_league_eng", "comp_serie_a_it"))
+print("STORE counts", c)
+print("STORE laliga backfill", {k: v for k, v in s["backfilled"].items() if "laliga" in k})
