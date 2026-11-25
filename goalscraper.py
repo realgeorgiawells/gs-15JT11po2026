@@ -226,6 +226,7 @@ class Store:
         self.seasons = d.get("seasons", {})      # comp -> latest season label seen
         self.upcoming = d.get("upcoming", {})    # comp -> last date OpenFootAPI listed a game before it was played
         self.upcoming_since = d.get("upcoming_since")   # when that tracking started
+        self.team_alias = {}                     # European/continental id -> the same club's league id (rebuilt each run)
 
     def save(self, keep_after_ts, keep_longer=(), longer_after_ts=None):
         """Drop old results; international competitions are kept longer (national teams play rarely)."""
@@ -247,6 +248,9 @@ class Store:
         ht, at = m.get("homeTeam") or {}, m.get("awayTeam") or {}
         hid = fix_team(mid, ht.get("id") or ("name:" + norm(ht.get("name"))))
         aid = fix_team(mid, at.get("id") or ("name:" + norm(at.get("name"))))
+        for t in (hid, aid):
+            if t in self.team_alias and t not in self.teams:
+                self.teams[t] = [t, None, None]
         for t, tid in ((ht, hid), (at, aid)):
             prev = self.teams.get(tid, [None, None, None])
             home_comp = fix_comp(mid, t.get("competitionId")) or prev[1]
@@ -255,8 +259,8 @@ class Store:
             self.teams[tid] = [t.get("name") or prev[0], home_comp, t.get("country") or prev[2]]
         sc = m.get("score") or {}
         status = norm(m.get("status"))
-        rec = [comp, season, to_ts(m["kickoffAt"]), hid, aid, sc.get("home"), sc.get("away"), status,
-               m.get("round") or "", bool(m.get("kickoffTimeKnown", True))]
+        rec = [comp, season, to_ts(m["kickoffAt"]), self.team_alias.get(hid, hid), self.team_alias.get(aid, aid),
+               sc.get("home"), sc.get("away"), status, m.get("round") or "", bool(m.get("kickoffTimeKnown", True))]
         if comp != (m.get("competitionId") or "") and self.duplicate(mid, rec):
             return None
         self.matches[mid] = rec
@@ -1110,6 +1114,36 @@ class Build:
                       if tid in (v[3], v[4]) and not self.store.is_cup(v[0]))
         return cnt.most_common(1)[0][0] if cnt else None
 
+    CONTINENTAL = ("eur", "asia", "sout", "conc", "afri", "ocea", "nort", "cent")
+
+    def link_continental(self):
+        """OpenFootAPI gives clubs a separate id in European/continental competitions (team_barcelona_eur vs
+        team_barcelona_es). Link each to the same club's league id, so its league results count everywhere."""
+        teams = self.store.teams
+        by_base = defaultdict(list)
+        for tid in teams:
+            if "_" in tid and tid.rsplit("_", 1)[1] not in self.CONTINENTAL:
+                by_base[tid.rsplit("_", 1)[0]].append(tid)
+        alias = {}
+        for tid, rec in teams.items():
+            if "_" not in tid or tid.rsplit("_", 1)[1] not in self.CONTINENTAL:
+                continue
+            if rec[1] and self.pool_of(rec[1]).endswith("nat"):
+                continue                                  # national teams stay as they are
+            cands = by_base.get(tid.rsplit("_", 1)[0], [])
+            if len(cands) > 1 and rec[0]:
+                cands = [c for c in cands if norm(teams[c][0]) == norm(rec[0])] or cands
+            if len(cands) == 1:
+                alias[tid] = cands[0]
+        self.store.team_alias = alias
+        n = 0
+        for v in self.store.matches.values():
+            for i in (3, 4):
+                if v[i] in alias:
+                    v[i] = alias[v[i]]
+                    n += 1
+        return len(alias), n
+
     def pool_of(self, cid):
         no = self.of_to_no.get(cid)
         return self.comp_by_no[no]["pool"] if no else "men_club"
@@ -1132,6 +1166,9 @@ class Build:
     def run(self):
         S, M, R = self.S, self.S["model"], self.S["requests"]
         stats = {"dropped_postponed": 0, "dropped_started": 0, "other_competitions": 0}
+        linked, moved = self.link_continental()
+        if moved:
+            print(f"  linked {linked} clubs' European ids to their league ids ({moved} results)")
 
         # 1) recent dates (results + the window's fixtures)
         today = self.ref.astimezone(timezone.utc).date()
