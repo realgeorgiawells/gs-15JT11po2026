@@ -396,7 +396,6 @@
    "pool": "men_club",
    "kind": "cup",
    "country": "World",
-   "rounds": "main",
    "openfoot_id": "comp_uefa_champions_league"
   },
   {
@@ -408,7 +407,6 @@
    "pool": "men_club",
    "kind": "cup",
    "country": "World",
-   "rounds": "main",
    "openfoot_id": "comp_uefa_europa_league"
   },
   {
@@ -420,7 +418,6 @@
    "pool": "men_club",
    "kind": "cup",
    "country": "World",
-   "rounds": "main",
    "openfoot_id": "comp_uefa_conference_league"
   },
   {
@@ -432,7 +429,6 @@
    "pool": "men_club",
    "kind": "cup",
    "country": "World",
-   "rounds": "qualifying",
    "virtual_of": [
     27,
     28,

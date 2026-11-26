@@ -478,11 +478,11 @@ class Archive:
             self.months[month] = load_json(self.folder / f"{month}.json", {})
         return self.months[month]
 
-    def update_from(self, store, since_ts):
-        """Copy every final result in the store (from since_ts on) into the archive. Nothing is ever removed."""
+    def update_from(self, store):
+        """Copy every final result in the store that the archive doesn't hold yet. Nothing is ever removed."""
         added = 0
         for mid, v in store.matches.items():
-            if v[7] not in FINAL_STATUSES or v[2] < since_ts:
+            if v[7] not in FINAL_STATUSES:
                 continue
             m = month_of(v[2])
             rows = self.load(m)
@@ -673,7 +673,7 @@ def pass_marks(S, key):
 def intl_pass_cfg(S):
     """(start, end, games per point) for the international pass mark, which rises as international results build up."""
     c = S.get("international_pass_mark") or {}
-    start = c.get("start", S.get("min_score_international", 40))
+    start = c.get("start", 40)
     return start, c.get("end", S["min_score"]), max(1, c.get("games_per_point", 50))
 
 
@@ -737,13 +737,6 @@ class PredLog:
         if month not in self.months:
             self.months[month] = load_json(self.folder / f"{month}.json", {})
         return self.months[month]
-
-    def load_range(self, from_ts, to_ts):
-        d = datetime.fromtimestamp(from_ts, timezone.utc).replace(day=1)
-        end = datetime.fromtimestamp(to_ts, timezone.utc)
-        while d <= end:
-            self.load(d.strftime("%Y-%m"))
-            d = (d + timedelta(days=32)).replace(day=1)
 
     def load_all(self):
         for p in sorted(self.folder.glob("[0-9][0-9][0-9][0-9]-[0-9][0-9].json")):
@@ -820,7 +813,6 @@ class PredLog:
 # ----------------------------------------------------------------------------------------------
 LIMITS = {"rho": (-0.20, 0.05, 0.01), "fav": (-0.15, 0.15, 0.01), "z00": (-0.60, 0.60, 0.04), "btts": (-0.50, 0.50, 0.04)}
 MIN_GAMES = {"club": 400, "intl": 150}
-NAMES = {"rho": "Draw correction", "fav": "Favourite strength", "z00": "0-0 allowance", "btts": "Both-score allowance"}
 
 
 def default_state(S):
@@ -1273,7 +1265,6 @@ class Build:
             fit = self.fit_ratings(pool, self.ref_ts, {t for _, m in its for t in (m["home"], m["away"])})
             self.log(f"  {pool}: {len(fit['matches'])} results, {len(fit['pri'])} teams")
             preds += self.predict(its, fit)
-        rank_sections(preds, self.S)
         for no, cov in self.cov.items():
             if cov["status"] in ("covered", "partial"):
                 cov["games"] = sum(1 for p in preds if p["comp_no"] == no)
@@ -1540,23 +1531,8 @@ def eligible(g, key):
     return bool(s[key].get("listed")) and not (key == "misses" and s["ballon"].get("pick"))
 
 
-def rank_sections(preds, S):
-    for key in RANK_ORDER:
-        cand = sorted([p for p in preds if eligible(p, key)], key=lambda p: (-p["sec"][key]["score"], p["ts"]))
-        n = 0
-        for r, p in enumerate(cand):
-            s = p["sec"][key]
-            s["rank"] = r + 1
-            mn = pass_marks(S, key)[1 if p["intl"] else 0]
-            s["pick"] = s["score"] >= mn and n < (S.get("top_n") or 10**6)
-            n += s["pick"]
-        for p in preds:
-            if not eligible(p, key):
-                p["sec"][key].update(rank=None, pick=False)
-
-
 def rank_by_day(games, S, tz):
-    """Top picks per Irish calendar day (exceptional scores can go past the top 10). Games carried over from the last list (already kicked off) keep their
+    """Picks per Irish calendar day: every game over its section's pass mark. Games carried over from the last list (already kicked off) keep their
     pick and use up their place; the rest compete for the remaining places."""
     days = defaultdict(list)
     for g in games:
@@ -1567,20 +1543,13 @@ def rank_by_day(games, S, tz):
             # ties (several games at 100) are broken by the actual chance, then kickoff
             listed = sorted([g for g in group if eligible(g, key)],
                             key=lambda g: (-g["sec"][key]["score"], -(g["sec"][key].get("p") or 0), g["ts"]))
-            used = sum(1 for g in listed if g.get("_carry") and g["sec"][key].get("pick"))
             for r, g in enumerate(listed):
                 sec = g["sec"][key]
                 sec["rank"] = r + 1
                 if g.get("_carry"):
                     continue
                 mn = pass_marks(S, key)[1 if g["intl"] else 0]
-                exc = S["sections"][key].get("exceptional", 101)
-                sec["exceptional"] = sec["score"] >= exc
-                # every game over the pass mark is a pick (top_n / max_picks only apply if set)
-                limit = S.get("top_n") or 10**6
-                cap = S["sections"][key].get("max_picks", S.get("max_picks")) or limit
-                sec["pick"] = sec["score"] >= mn and (used < limit or (sec["exceptional"] and used < cap))
-                used += sec["pick"]
+                sec["pick"] = sec["score"] >= mn          # every game over the pass mark is a pick
             for g in group:
                 if not eligible(g, key):
                     g["sec"][key].update(rank=None, pick=False)
@@ -1721,7 +1690,7 @@ def import_first_version(plog, comp_doc, path):
 
 def write_outputs(build, store, plog, archive, tz, gen, first_archive):
     """Archive the latest results, then rebuild Record and All results. Returns the files for the site."""
-    added = archive.update_from(store, 0 if first_archive else build.ref_ts - 30 * 86400)
+    added = archive.update_from(store)
     archive.save()
     if added:
         print(f"  archive: {added} new results")
@@ -2035,13 +2004,7 @@ def main(argv=None):
     today = {
         "app": "Goalscraper", "generated_utc": gen, "source": "OpenFootAPI", "plan": api.plan,
         "window_start_ts": build.ref_ts, "window_end_ts": build.end_ts, "timezone": settings["timezone"],
-        "top_n": settings.get("top_n"), "min_club": settings["min_score"], "min_intl": used_pass, "min_intl_end": i_end,
         "pass": {k: list(pass_marks(settings, k)) + [settings["sections"][k].get("min_score", settings["min_score"])] for k in SECTIONS},
-        "exceptional": {k: v.get("exceptional") for k, v in settings["sections"].items() if isinstance(v, dict)},
-        "max_picks": {k: settings["sections"][k].get("max_picks", settings.get("max_picks")) for k in SECTIONS},
-        "ballon_min": settings["sections"]["ballon"].get("min_favourite"),
-        "misses_longest": settings["sections"]["misses"].get("longest_price"),
-        "goals_max": settings["sections"]["goals"].get("max_chance_of_goal"),
         "games": sorted(preds + carry, key=lambda p: p["ts"]), "new_competitions": new_names,
         "days": sorted({g["day"] for g in preds + carry}),
     }
@@ -2049,7 +2012,6 @@ def main(argv=None):
     # none of them listed beforehand (every run looks at today and tomorrow, so a listed game is always seen first).
     # Clears itself as soon as a game is listed in advance.
     since_ts = int(datetime.fromisoformat(store.upcoming_since + "T00:00:00+00:00").timestamp()) if store.upcoming_since else build.ref_ts
-    watched = (now_local.date() - date.fromisoformat(store.upcoming_since)).days if store.upcoming_since else 0
     recent_cut = max(build.ref_ts - 21 * 86400, since_ts)
     upcoming_cut = (now_local.date() - timedelta(days=21)).isoformat()
     live_comps = {e.get("c") for _, e in plog.entries(build.ref_ts - 21 * 86400, build.ref_ts + 2 * 86400)
@@ -2077,13 +2039,13 @@ def main(argv=None):
                           "matched": [{"id": i, "name": store.comp_name(i)} for i in ids if i], "matched_count": len(ids)})
     coverage = {
         "generated_utc": gen, "plan": api.plan, "source": "OpenFootAPI", "manual": not scheduled,
-        "requests_used": api.used, "requests_available": api.limit, "monthly_remaining": api.quota_remaining,
+        "requests_used": api.used, "monthly_remaining": api.quota_remaining,
         "games_scored": len(preds), **stats, "competitions": comps_out,
         "notes": (build.tsdb_skipped + (build.tsdb.errors if build.tsdb else []) + build.notes)[:30], "last_error": None,
         "thesportsdb": {"requests": build.tsdb.used if build.tsdb else 0, "games": sum(build.tsdb_used.values()),
                         "skipped": len(build.tsdb_skipped), "leagues": {str(k): v for k, v in build.tsdb_leagues.items()}},
         "archive_months": len(archive.months_on_disk()), "catchup_last": today_s if catchup else state.get("catchup_local_date"),
-        "results_only_watch_days": watched,
+
         "model": {"version": ms["version"], "changes": ms["changes"][:15], "intl_pass": ipass, "intl_pass_end": i_end,
                   "form_weight": ms["form_weight"], "half_life": ms["half_life"]},
     }

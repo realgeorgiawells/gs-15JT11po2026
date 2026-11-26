@@ -10,23 +10,31 @@ morning.
 
 | Section | A pick goes wrong if… | Rules |
 | --- | --- | --- |
-| Easy Goals | the game ends 0-0 | games over 98% likely to have a goal are too short to be picks |
-| Misses | the team wins | underdogs no longer than 25/1, in games without an 80%+ favourite |
-| Ballon d'Or | the team doesn't win | favourites at 80% or more |
+| Easy Goals | the game ends 0-0 | — |
+| Misses | the team wins | any game that isn't a Ballon d'Or pick |
+| Ballon d'Or | the team doesn't win | the favourite in any game |
 | Raining Goals | either team fails to score | — |
 
-Each game gets a 1-100 score per section, on that section's own scale (set in `config/settings.json`). A pick needs
-50; up to 10 per section, never padded. Misses and Ballon d'Or never share a game. The Selected tab lists the picks
-from Easy Goals, Misses and Ballon d'Or in kickoff order.
+Each game gets a 1-100 score per section, on that section's own scale (set in `config/settings.json`). **Every game
+over its section's pass mark is a pick**, however many that is: 65 in every section (about a 95% chance of a goal in
+Easy Goals, an 83% chance of not winning in Misses, an 84% chance of winning in Ballon d'Or, a 66% chance of both
+scoring in Raining Goals). Picks are chosen per day; the app shows today's and switches to tomorrow's at 23:50. The
+Selected tab lists the picks from Easy Goals, Misses and Ballon d'Or in kickoff order.
 
-**Internationals** start with a pass mark of 40, because national teams play few games and their scores run lower.
-It rises 1 point for every 50 international games Goalscraper has predicted and settled, up to 50, never goes
-down, and pauses while the model check flags internationals for review.
+Old limits can be switched back on in `config/settings.json` if needed: `max_chance_of_goal` (Easy Goals "too
+short"), `longest_price` (Misses underdogs) and `min_favourite` (Ballon d'Or).
+
+**Internationals** have a pass mark 10 below each section's, because national teams play few games and their scores
+run lower. The gap shrinks by 1 point for every 50 international games Goalscraper has predicted and settled, never
+grows, and pauses while the model check flags internationals for review.
+
+**Clubs in Europe:** OpenFootAPI gives clubs a separate id in European and other continental competitions; each is
+linked to the club's league id, so its league results count in every competition.
 
 ## The app
 
 - **Selected / Easy Goals / Misses / Ballon d'Or / Raining Goals** (bottom bar): today's picks, with the next best below.
-- **Menu (≡):** All games, Record, Coverage, How it works.
+- **Menu (≡):** All games, By competition, Record, Coverage, How it works.
 - **Record:** a tab per section (last 30 days and all time, by score, by competition, every settled pick by day)
   and **All results**: every stored result, with Goalscraper's scores for the games it rated, and the **model
   check**: forecast against actual (0-0s, draws, home wins, both scoring) for each competition over 180 days,
@@ -56,7 +64,7 @@ down, and pauses while the model check flags internationals for review.
 | `data/archive/` | **Permanent results archive:** every result OpenFootAPI has returned, one file per month, never deleted |
 | `data/log/` | Every prediction Goalscraper has made, with its result |
 | `data/` (other files) | Today's list, record, coverage report, model state |
-| `tools/` | Logo generator, a simulated OpenFootAPI for testing, and a preview builder |
+| `tools/mockopenfoot.py` | A simulated OpenFootAPI for testing (`python goalscraper.py --mock`) |
 
 `data/store.json` (the working copy of recent results) lives in GitHub's cache, not the repository. If GitHub ever
 clears it, the next run rebuilds it from `data/archive/` without extra requests.

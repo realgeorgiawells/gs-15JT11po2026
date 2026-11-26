@@ -42,7 +42,6 @@ header{position:sticky;top:0;z-index:15;background:rgba(15,17,20,.92);backdrop-f
   background:linear-gradient(180deg,var(--gold-hi),var(--gold) 60%,var(--gold-lo));-webkit-background-clip:text;background-clip:text;color:transparent}
 .menu-btn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line2);background:var(--panel);display:grid;place-items:center;cursor:pointer}
 .menu-btn svg{width:20px;height:20px;stroke:var(--gold);fill:none;stroke-width:2;stroke-linecap:round}
-.mock{font:600 10.5px/1 var(--plain);letter-spacing:.5px;color:#1b1610;background:var(--gold);border-radius:999px;padding:3px 7px;margin-right:4px}
 /* section head */
 .sh{padding:16px 2px 10px}
 .sh h2{margin:0;font:700 15px/1.2 var(--engraved);letter-spacing:3px;color:var(--gold);text-transform:uppercase}
@@ -145,12 +144,10 @@ nav button{background:none;border:0;display:flex;flex-direction:column;align-ite
 nav button svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 nav button.on{color:var(--gold-hi)}
 nav button.on::before{content:"";position:absolute;top:0;left:25%;right:25%;height:2px;background:var(--gold);box-shadow:0 0 8px var(--gold)}
-.hidden{display:none!important}
 .banner{margin-top:12px;padding:10px 12px;border-radius:12px;font-size:13px;border:1px solid}
 .banner b{font-family:var(--engraved);letter-spacing:1px;font-size:11.5px}
 .banner.stale{border-color:rgba(229,72,77,.5);background:rgba(229,72,77,.08);color:#f3b9bb}
 .banner.new{border-color:rgba(76,195,138,.45);background:rgba(76,195,138,.07);color:#bfead3}
-.daystr{font-size:12px;color:var(--faint);padding:8px 2px 0}
 .res{font:700 11.5px/1.5 var(--plain);padding:1px 7px;border-radius:999px;border:1px solid;white-space:nowrap}
 .res.won{color:#7fdcaf;border-color:rgba(76,195,138,.4);background:rgba(76,195,138,.1)}
 .res.lost{color:#f3a0a3;border-color:rgba(229,72,77,.45);background:rgba(229,72,77,.1)}
@@ -267,7 +264,7 @@ const dayGames = () => D.games.filter(g => gameDay(g) === today());
 const todayName = () => new Intl.DateTimeFormat("en-IE", {timeZone: "UTC", weekday: "long", day: "numeric", month: "long"}).format(new Date(today() + "T12:00:00Z"));
 const kicked = g => g.ts <= now() || g.tags.includes("postponed") || !!g.result;
 /* pass marks per section: [club, international now, international target] */
-const passOf = key => (D.pass && D.pass[key]) || [D.min_club, D.min_intl, D.min_intl_end || D.min_club];
+const passOf = key => D.pass[key];
 const picks = key => dayGames().filter(g => g.sec[key].pick).sort((a, b) => a.sec[key].rank - b.sec[key].rank);
 const teamOf = (g, key) => g[g.sec[key].team].name;
 
@@ -314,7 +311,7 @@ function details(g, key){
 function pickRow(g, key){
   const s = g.sec[key], [v, l] = SEC[key].fig(g);
   return `<div class="row" data-open="${key}-${g.fid}">
-    <div class="sc" style="color:${hue(s.score)}">${s.score.toFixed(1)}<small>#${s.rank}${s.exceptional && s.pick ? ` <b style="color:var(--gold-hi)">★</b>` : ""}${page === "comps" && s.pick ? `<br><b style="color:var(--gold-hi)">PICK</b>` : ""}</small></div>
+    <div class="sc" style="color:${hue(s.score)}">${s.score.toFixed(1)}<small>#${s.rank}${page === "comps" && s.pick ? `<br><b style="color:var(--gold-hi)">PICK</b>` : ""}</small></div>
     <div class="mid"><div class="teams">${teamsLine(g, key)}</div><div class="sub">${subLine(g, key)}</div></div>
     <div class="kf"><b>${v}</b><i>${l}</i></div></div>${details(g, key)}`;
 }
@@ -612,13 +609,13 @@ function coverageView(){
 function howView(){
   return `<button class="back" data-back><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg>BACK</button>
     <div class="sh"><h2>How it works</h2></div><div class="panel prose">
-    <h3>The score</h3>Every pick gets a score from 1 to 100 for how unlikely it is to go wrong, on its own section's scale. It isn't a percentage. A game becomes a pick at its section's minimum score: ${D.pass ? `${D.pass.goals[0]} for Easy Goals, Misses and Raining Goals, ${D.pass.ballon[0]} for Ballon d'Or` : D.min_club} (internationals a little lower while their results build up). Every game over the mark is a pick, however many that is, and lists are never padded. Next best shows the games just under it.
+    <h3>The score</h3>Every pick gets a score from 1 to 100 for how unlikely it is to go wrong, on its own section's scale. It isn't a percentage. A game becomes a pick at its section's minimum score: ${D.pass.goals[0]} for Easy Goals and Misses, ${D.pass.btts[0]} for Raining Goals, ${D.pass.ballon[0]} for Ballon d'Or (internationals a little lower while their results build up). Every game over the mark is a pick, however many that is, and lists are never padded. Next best shows the games just under it.
     <h3>Easy Goals</h3>Goes wrong on a 0-0. A game 97% or more likely to have a goal scores 100; ties at 100 are ranked by the actual chance.
     <h3>Misses and Ballon d'Or</h3>A game goes on only one of the two. Ballon d'Or takes the favourite in any game that reaches its pass mark (50 is an 80% chance to win, 65 about 84%, 90 about 88.5%). Every other game can go in Misses, including strong favourites that just missed Ballon d'Or, where a 3/1 underdog scores about 50 and a 25/1 underdog 100.
     <h3>Raining Goals</h3>Goes wrong if either team fails to score.
     <h3>Team strength</h3>Attack and defence ratings come from every result, adjusted for the opponent and the league, and update every morning. Recent form counts a little extra. National teams use three years of internationals.
     <h3>Learning from results</h3>Every prediction is stored and checked against what happened. Each morning, settings are nudged where the evidence shows the forecasts are off, separately for clubs and internationals. Changes are listed on the Coverage screen.
-    <h3>Updates</h3>The list is made at 6:15 each morning. It scores today's games and tomorrow's, and picks the best games for each day; the app shows today's, with games that have kicked off moved to the bottom, and switches to tomorrow's at 23:50 (they're refreshed again at 6:15). At about 6 pm a short update marks postponed games and adds the results so far; it never changes picks or scores.
+    <h3>Updates</h3>The list is made at 6:15 each morning. It scores today's games and tomorrow's, and every game over its section's pass mark is a pick; the app shows today's, with games that have kicked off moved to the bottom, and switches to tomorrow's at 23:50 (they're refreshed again at 6:15). At about 6 pm a short update marks postponed games and adds the results so far; it never changes picks or scores.
     <h3>Results only</h3>Some competitions on OpenFootAPI only get results after the games are played, never the games beforehand. For most of them (Scotland, Portugal, Brazil, MLS and others) Goalscraper takes the upcoming games from TheSportsDB instead, matching both teams strictly; a game it can't match is skipped and listed under Notes on Coverage. Their picks settle when OpenFootAPI adds the results, which can take a few days. Any others can't be scored. Coverage labels them "Results only" (after two weeks of watching), and the label goes as soon as OpenFootAPI lists their games in advance. Their results still feed the team ratings. Every Monday, Goalscraper also looks back 14 days for results that were added late.
     <h3>International pass mark</h3>Internationals start with a lower pass mark because national teams play few games, which keeps their scores lower. It rises 1 point for every 50 international games Goalscraper has predicted and settled, up to the club mark, and pauses while the model check flags internationals.
     <h3>Record</h3>Each section's tab shows its hit rate over the last 30 days and all time, how each score band and competition has done, and every settled pick by day. All results holds every result stored, with Goalscraper's scores for the games it rated, and the model check: forecast against actual for each competition, flagged when the gap is too big to be bad luck.
